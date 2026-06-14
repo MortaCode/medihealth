@@ -14,6 +14,9 @@ public class Product {
     @TableId
     private String id;
 
+    /** 所属 SPU ID（关联 t_product_spu） */
+    private String spuId;
+
     private String name;
 
     private String description;

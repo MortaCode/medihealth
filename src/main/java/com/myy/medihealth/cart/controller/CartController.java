@@ -20,6 +20,11 @@ public class CartController {
     private final CartService cartService;
     private final UserService userService;
 
+    /**
+     * 购物车
+     * @param request
+     * @return
+     */
     @GetMapping("/list")
     public Result<List<CartItem>> list(HttpServletRequest request) {
         String userId = userService.getLoginUserId(request);
@@ -27,6 +32,12 @@ public class CartController {
         return Result.success(items);
     }
 
+    /**
+     * 添加购物车
+     * @param vo
+     * @param request
+     * @return
+     */
     @PostMapping("/add")
     public Result<CartItem> add(@Valid @RequestBody CartAddVo vo, HttpServletRequest request) {
         String userId = userService.getLoginUserId(request);
