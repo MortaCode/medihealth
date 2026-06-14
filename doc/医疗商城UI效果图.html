@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>微医健康 · 医疗商城</title>
+<style>
+  :root {
+    --primary: #2B7BD6;
+    --primary-dark: #1A5DA6;
+    --primary-light: #EBF3FC;
+    --bg: #F2F4F7;
+    --card-bg: #FFFFFF;
+    --text: #1A1A1A;
+    --text-secondary: #666666;
+    --text-light: #999999;
+    --danger: #FA5151;
+    --warning: #FF9500;
+    --success: #07C160;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 2px 12px rgba(0,0,0,0.06);
+    --shadow-hover: 0 4px 20px rgba(0,0,0,0.1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 16px;
+  }
+
+  .mobile-container {
+    width: 100%;
+    max-width: 420px;
+    height: 900px;
+    background: var(--bg);
+    border-radius: 28px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.12), 0 0 0 2px #00000008;
+    position: relative;
+  }
+
+  /* ---- Header ---- */
+  .header {
+    background: linear-gradient(135deg, var(--primary) 0%, #2370C4 50%, var(--primary-dark) 100%);
+    padding: 20px 16px 16px;
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .header-title {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  .header-actions {
+    display: flex; gap: 12px; align-items: center;
+  }
+  .cart-btn {
+    position: relative;
+    width: 36px; height: 36px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .cart-btn:hover { background: rgba(255,255,255,0.3); }
+  .cart-badge {
+    position: absolute; top: -4px; right: -4px;
+    background: var(--danger);
+    color: #fff;
+    font-size: 10px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+    border: 2px solid var(--primary);
+  }
+
+  /* Search Bar */
+  .search-bar {
+    display: flex; align-items: center;
+    background: rgba(255,255,255,0.2);
+    border-radius: 22px;
+    padding: 10px 16px;
+    gap: 8px;
+    cursor: text;
+    transition: background 0.2s;
+  }
+  .search-bar:hover { background: rgba(255,255,255,0.28); }
+  .search-icon { font-size: 16px; opacity: 0.8; }
+  .search-text { font-size: 13px; opacity: 0.7; flex: 1; }
+  .search-hot {
+    font-size: 11px;
+    padding: 2px 8px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 10px;
+  }
+
+  /* ---- Category Tabs ---- */
+  .category-tabs {
+    display: flex;
+    gap: 0;
+    padding: 12px 16px;
+    background: var(--card-bg);
+    border-bottom: 1px solid #eee;
+    flex-shrink: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .category-tabs::-webkit-scrollbar { height: 0; }
+  .cat-tab {
+    flex-shrink: 0;
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--bg);
+    margin-right: 8px;
+    font-weight: 500;
+  }
+  .cat-tab.active {
+    background: var(--primary);
+    color: #fff;
+    font-weight: 600;
+  }
+  .cat-tab:hover:not(.active) {
+    background: var(--primary-light);
+    color: var(--primary);
+  }
+
+  /* ---- Product Grid ---- */
+  .product-grid {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    align-content: start;
+  }
+  .product-grid::-webkit-scrollbar { width: 0; }
+
+  .product-card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+    position: relative;
+  }
+  .product-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+  }
+
+  /* Product Image Placeholder */
+  .product-img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background: linear-gradient(145deg, #E8EEF6 0%, #D8E4F2 50%, #C8D8EA 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    position: relative;
+  }
+  .product-category-药品 .product-img { background: linear-gradient(145deg, #E8F4E8 0%, #D0EAD0 50%, #B8DDB8 100%); }
+  .product-category-保健品 .product-img { background: linear-gradient(145deg, #FFF0E0 0%, #FFE0C0 50%, #FFD0A0 100%); }
+  .product-category-体检套餐 .product-img { background: linear-gradient(145deg, #E0F0FF 0%, #C8E0FF 50%, #B0D0FF 100%); }
+  .product-category-医疗服务 .product-img { background: linear-gradient(145deg, #F0E0F8 0%, #E0C8F0 50%, #D0B0E8 100%); }
+
+  /* Prescription badge */
+  .rx-badge {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    background: var(--danger);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 3px 7px;
+    border-radius: 3px;
+    letter-spacing: 0.5px;
+  }
+
+  /* Sales badge */
+  .sales-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    font-size: 9px;
+    padding: 2px 7px;
+    border-radius: 8px;
+  }
+
+  .product-info {
+    padding: 10px 12px 12px;
+  }
+  .product-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-bottom: 6px;
+  }
+  .product-price-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .product-price {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--danger);
+  }
+  .product-price .unit {
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .product-sales {
+    font-size: 11px;
+    color: var(--text-light);
+  }
+  .add-cart-btn {
+    width: 100%;
+    padding: 7px 0;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+  .add-cart-btn:hover {
+    background: var(--primary-dark);
+    transform: scale(1.02);
+  }
+  .add-cart-btn.added {
+    background: var(--success);
+  }
+
+  /* ---- Bottom Cart Bar ---- */
+  .cart-bar {
+    background: var(--card-bg);
+    border-top: 1px solid #eee;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.04);
+  }
+  .cart-summary {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .cart-icon-wrap {
+    position: relative;
+  }
+  .cart-icon {
+    width: 44px; height: 44px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    color: #fff;
+  }
+  .cart-count {
+    position: absolute; top: -4px; right: -4px;
+    background: var(--danger);
+    color: #fff;
+    font-size: 10px;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+  }
+  .cart-total-price {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--danger);
+  }
+  .cart-total-label {
+    font-size: 11px;
+    color: var(--text-light);
+  }
+  .checkout-btn {
+    padding: 12px 32px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff;
+    border: none;
+    border-radius: 24px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 16px rgba(43, 123, 214, 0.3);
+    transition: all 0.2s;
+  }
+  .checkout-btn:hover {
+    transform: scale(1.03);
+    box-shadow: 0 6px 20px rgba(43, 123, 214, 0.4);
+  }
+
+  /* Responsive */
+  @media (max-width: 440px) {
+    .mobile-container {
+      max-width: 100%;
+      height: 100vh;
+      border-radius: 0;
+      box-shadow: none;
+    }
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.8);
+    background: rgba(0,0,0,0.78);
+    color: #fff;
+    padding: 10px 24px;
+    border-radius: 24px;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s;
+    z-index: 1000;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+</style>
+</head>
+<body>
+
+<div class="mobile-container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-top">
+      <div class="header-title">&#9877; 微医健康商城</div>
+      <div class="header-actions">
+        <div class="cart-btn" onclick="scrollToBottom()">
+          &#128722;
+          <span class="cart-badge" id="header-cart-count">2</span>
+        </div>
+      </div>
+    </div>
+    <div class="search-bar">
+      <span class="search-icon">&#128269;</span>
+      <span class="search-text">搜索药品、保健品、体检套餐...</span>
+      <span class="search-hot">热门：感冒药</span>
+    </div>
+  </div>
+
+  <!-- Category Tabs -->
+  <div class="category-tabs" id="category-tabs">
+    <span class="cat-tab active" data-cat="全部">全部</span>
+    <span class="cat-tab" data-cat="药品">&#128138; 药品</span>
+    <span class="cat-tab" data-cat="保健品">&#127807; 保健品</span>
+    <span class="cat-tab" data-cat="体检套餐">&#128206; 体检套餐</span>
+    <span class="cat-tab" data-cat="医疗服务">&#128680; 医疗服务</span>
+  </div>
+
+  <!-- Product Grid -->
+  <div class="product-grid" id="product-grid">
+    <!-- Filled by JS -->
+  </div>
+
+  <!-- Bottom Cart Bar -->
+  <div class="cart-bar">
+    <div class="cart-summary">
+      <div class="cart-icon-wrap">
+        <div class="cart-icon">&#128722;</div>
+        <span class="cart-count" id="cart-count">2</span>
+      </div>
+      <div>
+        <div class="cart-total-price"><span class="unit">&yen;</span><span id="cart-total">106.90</span></div>
+        <div class="cart-total-label">共<span id="cart-item-count">3</span>件商品</div>
+      </div>
+    </div>
+    <button class="checkout-btn">去结算</button>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+(function() {
+  // Product data
+  var products = [
+    {
+      id: 'prod_001', name: '布洛芬缓释胶囊', price: 28.50, category: '药品',
+      emoji: '&#128137;', sales: '1.2万+', rx: false,
+      desc: '缓解头痛、关节痛、发热等'
+    },
+    {
+      id: 'prod_002', name: '对乙酰氨基酚片', price: 15.80, category: '药品',
+      emoji: '&#128137;', sales: '9800+', rx: false,
+      desc: '感冒发热、轻中度疼痛'
+    },
+    {
+      id: 'prod_003', name: '阿莫西林胶囊', price: 32.00, category: '药品',
+      emoji: '&#128137;', sales: '6720+', rx: true,
+      desc: '广谱抗生素（处方药）'
+    },
+    {
+      id: 'prod_004', name: '维生素C咀嚼片', price: 68.00, category: '保健品',
+      emoji: '&#127826;', sales: '2.3万+', rx: false,
+      desc: '增强免疫力 每片500mg'
+    },
+    {
+      id: 'prod_005', name: '钙尔奇D片', price: 128.00, category: '保健品',
+      emoji: '&#128156;', sales: '1.5万+', rx: false,
+      desc: '钙+维D3 骨骼健康'
+    },
+    {
+      id: 'prod_006', name: '基础体检套餐', price: 299.00, category: '体检套餐',
+      emoji: '&#128202;', sales: '4520+', rx: false,
+      desc: '血常规/肝肾功能/心电图等'
+    },
+    {
+      id: 'prod_007', name: '全面体检套餐（尊享版）', price: 1299.00, category: '体检套餐',
+      emoji: '&#127775;', sales: '2180+', rx: false,
+      desc: '含肿瘤标志物/骨密度等'
+    },
+    {
+      id: 'prod_008', name: '线上问诊（全科）', price: 49.90, category: '医疗服务',
+      emoji: '&#128105;&#8205;&#9877;&#65039;', sales: '8920+', rx: false,
+      desc: '30分钟视频问诊'
+    },
+    {
+      id: 'prod_009', name: '专家门诊预约', price: 200.00, category: '医疗服务',
+      emoji: '&#127973;', sales: '3450+', rx: false,
+      desc: '三甲副主任及以上专家'
+    },
+    {
+      id: 'prod_010', name: '中医问诊调理', price: 99.00, category: '医疗服务',
+      emoji: '&#127794;', sales: '5670+', rx: false,
+      desc: '望闻问切 个性化方案'
+    }
+  ];
+
+  var cart = {};
+  // Pre-add two items to cart for demo
+  addToCartLocal('prod_001', 1);
+  addToCartLocal('prod_008', 1);
+  var addedProducts = {};
+
+  var currentCat = '全部';
+
+  function renderProducts() {
+    var grid = document.getElementById('product-grid');
+    var filtered = currentCat === '全部'
+      ? products
+      : products.filter(function(p) { return p.category === currentCat; });
+
+    var html = '';
+    filtered.forEach(function(p) {
+      var catClass = 'product-category-' + p.category;
+      var rxHtml = p.rx ? '<span class="rx-badge">&#9888; Rx处方药</span>' : '';
+      var addedClass = addedProducts[p.id] ? ' added' : '';
+      var btnText = addedProducts[p.id] ? '&#10003; 已加入' : '加入购物车';
+
+      html += '<div class="product-card ' + catClass + '">';
+      html += '  <div class="product-img">';
+      html +=     rxHtml;
+      html +=     '<span class="sales-badge">已售 ' + p.sales + '</span>';
+      html += '    <span style="font-size:44px;">' + p.emoji + '</span>';
+      html += '  </div>';
+      html += '  <div class="product-info">';
+      html += '    <div class="product-name">' + p.name + '</div>';
+      html += '    <div class="product-price-row">';
+      html += '      <div class="product-price"><span class="unit">&yen;</span>' + p.price.toFixed(2) + '</div>';
+      html += '      <div class="product-sales">已售 ' + p.sales + '</div>';
+      html += '    </div>';
+      html += '    <button class="add-cart-btn' + addedClass + '" data-id="' + p.id + '">' + btnText + '</button>';
+      html += '  </div>';
+      html += '</div>';
+    });
+    grid.innerHTML = html;
+
+    // Bind add-to-cart buttons
+    var buttons = grid.querySelectorAll('.add-cart-btn');
+    buttons.forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var pid = this.getAttribute('data-id');
+        addToCartLocal(pid, 1);
+        this.classList.add('added');
+        this.innerHTML = '&#10003; 已加入';
+        showToast('已加入购物车');
+      });
+    });
+  }
+
+  function addToCartLocal(productId, qty) {
+    if (!cart[productId]) {
+      cart[productId] = qty;
+    } else {
+      cart[productId] += qty;
+    }
+    addedProducts[productId] = true;
+    updateCartBar();
+  }
+
+  function updateCartBar() {
+    var totalItems = 0;
+    var totalPrice = 0;
+    Object.keys(cart).forEach(function(pid) {
+      var p = products.find(function(pr) { return pr.id === pid; });
+      if (p) {
+        totalItems += cart[pid];
+        totalPrice += cart[pid] * p.price;
+      }
+    });
+    document.getElementById('cart-count').textContent = totalItems;
+    document.getElementById('header-cart-count').textContent = totalItems;
+    document.getElementById('cart-total').textContent = totalPrice.toFixed(2);
+    document.getElementById('cart-item-count').textContent = totalItems;
+  }
+
+  // Category tab switching
+  document.getElementById('category-tabs').addEventListener('click', function(e) {
+    if (e.target.classList.contains('cat-tab')) {
+      document.querySelectorAll('.cat-tab').forEach(function(t) { t.classList.remove('active'); });
+      e.target.classList.add('active');
+      currentCat = e.target.getAttribute('data-cat');
+      renderProducts();
+    }
+  });
+
+  // Toast
+  function showToast(msg) {
+    var toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(function() {
+      toast.classList.remove('show');
+    }, 1500);
+  }
+
+  // Scroll to bottom
+  window.scrollToBottom = function() {
+    var container = document.querySelector('.mobile-container');
+    container.scrollTop = container.scrollHeight;
+  };
+
+  // Initial render
+  renderProducts();
+  updateCartBar();
+})();
+</script>
+
+</body>
+</html>

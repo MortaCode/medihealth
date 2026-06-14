@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>微医健康 · AI智能问诊</title>
+<style>
+  :root {
+    --primary: #07C160;
+    --primary-dark: #06AD56;
+    --primary-light: #E8F8EE;
+    --bg: #F5F6F8;
+    --card-bg: #FFFFFF;
+    --text: #1A1A1A;
+    --text-secondary: #666666;
+    --text-light: #999999;
+    --border: #E8E8E8;
+    --accent-blue: #4A90D9;
+    --accent-orange: #FF9500;
+    --danger: #FA5151;
+    --radius: 16px;
+    --radius-sm: 10px;
+    --shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 16px;
+  }
+
+  /* Mobile Container */
+  .mobile-container {
+    width: 100%;
+    max-width: 420px;
+    height: 850px;
+    background: var(--bg);
+    border-radius: 28px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.12), 0 0 0 2px #00000008;
+    position: relative;
+  }
+
+  /* ---- Header ---- */
+  .header {
+    background: linear-gradient(135deg, var(--primary) 0%, #05B050 50%, #049A42 100%);
+    padding: 20px 16px 16px;
+    color: #fff;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+  }
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .header-back {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .header-back:hover { background: rgba(255,255,255,0.3); }
+  .header-title-group {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .header-icon {
+    width: 32px; height: 32px;
+    background: rgba(255,255,255,0.25);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .header-title {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+  .header-more {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .header-more:hover { background: rgba(255,255,255,0.3); }
+
+  /* Badge row */
+  .badge-row {
+    display: flex; gap: 8px; margin-top: 4px;
+  }
+  .badge {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.22);
+    color: #fff;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+  }
+  .badge.active {
+    background: rgba(255,255,255,0.35);
+    font-weight: 600;
+  }
+  .badge-intent {
+    background: rgba(74, 144, 217, 0.7) !important;
+  }
+  .badge-confidence {
+    background: rgba(255, 149, 0, 0.65) !important;
+  }
+
+  /* Alert Banner */
+  .alert-banner {
+    margin: 10px 0 0;
+    padding: 10px 14px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 10px;
+    font-size: 12px;
+    display: flex; align-items: center; gap: 8px;
+    color: rgba(255,255,255,0.9);
+  }
+  .alert-banner .alert-icon {
+    font-size: 16px; flex-shrink: 0;
+  }
+
+  /* ---- Chat Area ---- */
+  .chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background: var(--bg);
+  }
+  .chat-area::-webkit-scrollbar { width: 0; }
+
+  /* Time Divider */
+  .time-divider {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-light);
+    margin: 4px 0;
+  }
+
+  /* Message Bubble */
+  .message {
+    display: flex;
+    gap: 10px;
+    max-width: 90%;
+    animation: msgIn 0.3s ease-out;
+  }
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .message.user {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+  }
+  .message.assistant {
+    align-self: flex-start;
+  }
+  .msg-avatar {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .message.user .msg-avatar {
+    background: linear-gradient(135deg, #4A90D9, #357ABD);
+    color: #fff;
+  }
+  .message.assistant .msg-avatar {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff;
+  }
+  .bubble {
+    background: var(--card-bg);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text);
+    box-shadow: var(--shadow);
+    position: relative;
+  }
+  .message.user .bubble {
+    background: var(--primary);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+  .message.assistant .bubble {
+    border-bottom-left-radius: 4px;
+  }
+
+  /* Structured advice inside assistant bubble */
+  .advice-section {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #f0f0f0;
+  }
+  .advice-section:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+  .advice-label {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--primary-dark);
+    margin-bottom: 4px;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .advice-label .dot {
+    width: 6px; height: 6px;
+    background: var(--primary);
+    border-radius: 50%;
+  }
+  .advice-text {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+  .disclaimer-box {
+    margin-top: 10px;
+    padding: 8px 10px;
+    background: #FFF9E6;
+    border-radius: 6px;
+    font-size: 11px;
+    color: #B8860B;
+    border-left: 3px solid var(--accent-orange);
+  }
+
+  /* Quick Reply Chips */
+  .quick-replies {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .quick-reply {
+    padding: 8px 14px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 12px;
+    color: var(--primary-dark);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .quick-reply:hover {
+    background: var(--primary-light);
+    border-color: var(--primary);
+  }
+
+  /* ---- Input Area ---- */
+  .input-area {
+    padding: 12px 16px 16px;
+    background: #fff;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .input-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .input-tools {
+    display: flex; gap: 4px;
+  }
+  .input-tool {
+    width: 36px; height: 36px;
+    background: var(--bg);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .input-tool:hover { background: var(--primary-light); color: var(--primary); }
+  .input-field {
+    flex: 1;
+    height: 40px;
+    background: var(--bg);
+    border: 1px solid transparent;
+    border-radius: 24px;
+    padding: 0 16px;
+    font-size: 14px;
+    outline: none;
+    color: var(--text);
+    transition: border-color 0.2s;
+  }
+  .input-field:focus {
+    border-color: var(--primary);
+    background: #fff;
+  }
+  .input-field::placeholder {
+    color: var(--text-light);
+  }
+  .send-btn {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    border: none;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: transform 0.2s, box-shadow 0.2s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .send-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 16px rgba(7, 193, 96, 0.35);
+  }
+
+  /* Footer */
+  .footer-safety {
+    text-align: center;
+    font-size: 10px;
+    color: var(--text-light);
+    margin-top: 8px;
+  }
+
+  /* Responsive */
+  @media (max-width: 440px) {
+    .mobile-container {
+      max-width: 100%;
+      height: 100vh;
+      border-radius: 0;
+      box-shadow: none;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="mobile-container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-top">
+      <div class="header-back">&larr;</div>
+      <div class="header-title-group">
+        <div class="header-icon">&#9877;</div>
+        <div class="header-title">微医健康 · AI智能问诊</div>
+      </div>
+      <div class="header-more">&vellip;</div>
+    </div>
+    <div class="badge-row">
+      <span class="badge active">&#128994; 在线</span>
+      <span class="badge badge-intent">意图：问诊咨询</span>
+      <span class="badge badge-confidence">置信度 94%</span>
+      <span class="badge">DeepSeek-V4</span>
+    </div>
+    <div class="alert-banner">
+      <span class="alert-icon">&#9888;</span>
+      <span>AI助手提供健康信息参考，不能替代专业医疗诊断。紧急情况请拨打120。</span>
+    </div>
+  </div>
+
+  <!-- Chat Area -->
+  <div class="chat-area">
+
+    <div class="time-divider">今天 14:32</div>
+
+    <!-- User Message 1 -->
+    <div class="message user">
+      <div class="msg-avatar">&#128104;</div>
+      <div class="bubble">
+        我头疼发烧38.5度，还咳嗽，应该吃什么药？
+      </div>
+    </div>
+
+    <!-- Assistant Reply 1 -->
+    <div class="message assistant" style="animation-delay: 0.2s;">
+      <div class="msg-avatar">&#9877;</div>
+      <div class="bubble">
+        根据您描述的症状，我为您进行如下分析：
+
+        <div class="advice-section">
+          <div class="advice-label"><span class="dot"></span>症状分析</div>
+          <div class="advice-text">头痛、发热（38.5℃）、咳嗽——符合急性上呼吸道感染的典型表现，可能与病毒感染有关（如普通感冒或流感早期）。发热是机体免疫防御的正常反应。</div>
+        </div>
+
+        <div class="advice-section">
+          <div class="advice-label"><span class="dot"></span>用药建议</div>
+          <div class="advice-text">
+            <strong>退热止痛：</strong>可选择<em>对乙酰氨基酚片</em>（成人每次500mg，每日不超过2g）或<em>布洛芬缓释胶囊</em>（每次200-400mg，餐后服用）。<br><br>
+            <strong>缓解咳嗽：</strong>如咳嗽不严重，建议多喝温水、蜂蜜水即可。如干咳影响休息，可在医生指导下使用右美沙芬。<br><br>
+            <strong>注意：</strong>请勿同时服用多种含退热成分的复方感冒药，以免重复用药导致过量。
+          </div>
+        </div>
+
+        <div class="advice-section">
+          <div class="advice-label"><span class="dot"></span>居家护理建议</div>
+          <div class="advice-text">多休息、多饮水（每天2000ml以上）、清淡饮食、保持室内通风。物理降温可用温水擦拭额头、腋下。</div>
+        </div>
+
+        <div class="disclaimer-box">
+          &#9888; <strong>重要提醒：</strong>如果发热持续超过3天、体温超过39.5℃、出现呼吸困难或意识模糊，请立即前往医院就诊。
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Replies -->
+    <div class="quick-replies" style="margin-left: 48px;">
+      <span class="quick-reply">还有什么需要注意的？</span>
+      <span class="quick-reply">附近有哪家医院的呼吸科比较好？</span>
+      <span class="quick-reply">如何预防感冒？</span>
+    </div>
+
+    <div class="time-divider">今天 14:34</div>
+
+    <!-- User Message 2 -->
+    <div class="message user">
+      <div class="msg-avatar">&#128104;</div>
+      <div class="bubble">
+        附近有哪家医院的呼吸科比较好？
+      </div>
+    </div>
+
+    <!-- Assistant Reply 2 -->
+    <div class="message assistant" style="animation-delay: 0.2s;">
+      <div class="msg-avatar">&#9877;</div>
+      <div class="bubble">
+        根据北京地区医疗资源数据，为您推荐以下医院的呼吸与危重症医学科：
+
+        <div class="advice-section">
+          <div class="advice-label"><span class="dot"></span>综合实力推荐</div>
+          <div class="advice-text">
+            <strong>1. 北京协和医院 呼吸与危重症医学科</strong><br>
+            国家级重点学科，在呼吸疑难病诊疗方面国内领先。<br>
+            地址：东城区帅府园1号<br>
+            评分：&#9733;&#9733;&#9733;&#9733;&#9733; 4.9<br><br>
+
+            <strong>2. 中日友好医院 呼吸中心</strong><br>
+            国家呼吸医学中心，设有呼吸科和胸外科联合诊疗。<br>
+            地址：朝阳区樱花园东街2号<br>
+            评分：&#9733;&#9733;&#9733;&#9733;&#9734; 4.7
+          </div>
+        </div>
+
+        <div class="advice-section">
+          <div class="advice-label"><span class="dot"></span>挂号指引</div>
+          <div class="advice-text">建议通过各医院官方微信公众号或APP提前预约，呼吸科门诊通常需要提前1-2周挂号。您也可以在本平台使用<strong>「专家门诊预约」</strong>服务快速预约。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Replies after hospital answer -->
+    <div class="quick-replies" style="margin-left: 48px;">
+      <span class="quick-reply">帮我预约协和医院</span>
+      <span class="quick-reply">需要提前准备什么？</span>
+      <span class="quick-reply">可以线上问诊吗？</span>
+    </div>
+
+  </div>
+
+  <!-- Input Area -->
+  <div class="input-area">
+    <div class="input-row">
+      <div class="input-tools">
+        <div class="input-tool" title="语音输入">&#127908;</div>
+      </div>
+      <input class="input-field" type="text" placeholder="请输入您的健康问题..." value="">
+      <div class="input-tools">
+        <div class="input-tool" title="添加图片">&#128444;</div>
+      </div>
+      <button class="send-btn" title="发送">&#10148;</button>
+    </div>
+    <div class="footer-safety">
+      &#128274; 对话内容加密传输 · AI生成内容仅供参考 · 不构成医疗建议
+    </div>
+  </div>
+
+</div>
+
+<!-- JS for interactive effects -->
+<script>
+(function() {
+  const input = document.querySelector('.input-field');
+  const sendBtn = document.querySelector('.send-btn');
+  const chatArea = document.querySelector('.chat-area');
+  const quickReplies = document.querySelectorAll('.quick-reply');
+
+  // Send message on button click
+  sendBtn.addEventListener('click', sendMessage);
+  input.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') sendMessage();
+  });
+
+  // Click quick reply chips
+  quickReplies.forEach(function(chip) {
+    chip.addEventListener('click', function() {
+      input.value = this.textContent;
+      sendMessage();
+    });
+  });
+
+  function sendMessage() {
+    var text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    addMessage('user', text);
+
+    setTimeout(function() {
+      var replies = {
+        '帮我预约协和医院': '好的，正在为您跳转到专家门诊预约页面...\n\n请确认以下信息：\n医院：北京协和医院\n科室：呼吸与危重症医学科\n预计可预约时间：2025年4月22日\n\n确认预约吗？',
+        '需要提前准备什么？': '就诊前建议准备以下材料：\n\n1. 身份证/医保卡\n2. 既往病历及检查报告\n3. 正在服用的药物清单\n4. 记录发病时间线（何时出现症状、体温变化等）\n\n如做血检，建议空腹就诊。',
+        '可以线上问诊吗？': '当然可以！您可以在本平台的"医疗商城"选择"线上问诊（全科）"服务，30分钟在线视频问诊仅需49.90元。医生可在线开具处方、解读检查报告，药品可配送到家。',
+        '如何预防感冒？': '预防感冒的关键措施：\n\n1. 勤洗手，使用七步洗手法\n2. 流感季佩戴口罩\n3. 保持室内通风\n4. 均衡饮食，保证充足睡眠\n5. 每年接种流感疫苗\n6. 适度锻炼增强体质\n\n感冒高发季避免去人群密集场所。',
+        '还有什么需要注意的？': '还需要注意以下几点：\n\n1. 不要同时服用多种含退热成分的药物\n2. 服药期间禁止饮酒\n3. 如果咳嗽加重或出现黄痰、胸痛，应及时就医\n4. 多休息比吃药更重要\n5. 注意观察体温变化，每4小时测量一次'
+      };
+      var reply = replies[text] || '感谢您的咨询。为了给您更准确的健康建议，请提供更多细节，例如：症状持续多久了？是否有其他不适？有无药物过敏史？';
+      addMessage('assistant', reply);
+    }, 800);
+  }
+
+  function addMessage(role, text) {
+    var div = document.createElement('div');
+    div.className = 'message ' + role;
+
+    var avatar = document.createElement('div');
+    avatar.className = 'msg-avatar';
+    avatar.innerHTML = role === 'user' ? '&#128104;' : '&#9877;';
+
+    var bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.innerHTML = text.replace(/\n/g, '<br>');
+
+    div.appendChild(avatar);
+    div.appendChild(bubble);
+    chatArea.appendChild(div);
+    chatArea.scrollTop = chatArea.scrollHeight;
+  }
+
+  // Auto-scroll to bottom on load
+  chatArea.scrollTop = chatArea.scrollHeight;
+})();
+</script>
+
+</body>
+</html>

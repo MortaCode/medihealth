@@ -1,0 +1,87 @@
+spring:
+  application:
+    name: MediHealth-de
+  datasource:
+    url: jdbc:mysql://localhost:3306/medihealth?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      minimum-idle: 8
+      maximum-pool-size: 12
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+retrieval:
+  hybrid:
+    vector-top-k: 5
+    bm25-top-k: 5
+    vector-weight: 0.6
+    bm25-weight: 0.4
+    relevance-threshold: 0.7
+    final-top-k: 5
+
+medical:
+  # 义诊名额秒杀配置
+  quota:
+    id: 20001
+    total: 500
+    name: 专家义诊名额
+    redis:
+      quota-key: "quota:20001"
+      lock-key: "lock:quota:20001"
+      lock-wait-time: 3
+      lock-lease-time: 30
+  api:
+    drug:
+      base-url: https://api.xxx.com/drug
+      api-key: ${DRUG_API_KEY:}
+    disease:
+      base-url: https://api.xxx.com/disease
+    hospital:
+      base-url: https://api.xxx.com/hospital
+      api-key: ${HOSPITAL_API_KEY:}
+    health:
+      base-url: https://api.xxx.com/health
+    http:
+      connect-timeout: 10
+      read-timeout: 30
+
+quota:
+  quota-id: 20001
+  total-quota: 500
+
+#wechat:
+#  mini-program:
+#    app-id: ${WECHAT_MINI_APP_ID:}
+#    app-secret: ${WECHAT_MINI_APP_SECRET:}
+#    code2session-url: https://api.weixin.qq.com/sns/jscode2session
+#  open-platform:
+#    app-id: ${WECHAT_OPEN_APP_ID:}
+#    app-secret: ${WECHAT_OPEN_APP_SECRET:}
+#    authorize-url: https://open.weixin.qq.com/connect/oauth2/authorize
+#    access-token-url: https://api.weixin.qq.com/sns/oauth2/access_token
+#    callback-url: ${WECHAT_CALLBACK_URL:}
+#    scope: snsapi_userinfo
+#  http:
+#    connect-timeout: 10
+#    read-timeout: 30
+#    max-retry: 3
+#
+#sms:
+#  provider: aliyun
+#  aliyun:
+#    access-key-id: ${ALIYUN_ACCESS_KEY_ID:}
+#    access-key-secret: ${ALIYUN_ACCESS_KEY_SECRET:}
+#    sign-name: 微医健康
+#    template-code: ${SMS_TEMPLATE_CODE:}
+#    endpoint: dysmsapi.aliyuncs.com
+#  rate-limit:
+#    per-minute: 1
+#    per-hour: 5
+#    per-day: 10
+
+
+
