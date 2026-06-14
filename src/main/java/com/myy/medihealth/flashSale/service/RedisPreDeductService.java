@@ -73,6 +73,15 @@ public class RedisPreDeductService {
     }
 
     /**
+     * 回滚名额：将指定名额 +1（INCR），用于异步补偿。
+     */
+    public void rollbackQuota(Long quotaId) {
+        String key = QUOTA_KEY_PREFIX + quotaId;
+        Long result = stringRedisTemplate.opsForValue().increment(key, 1);
+        log.info("Redis回滚名额 key={}, afterRollback={}", key, result);
+    }
+
+    /**
      * 查询 Redis 中当前剩余名额。
      *
      * @param quotaId 名额编号

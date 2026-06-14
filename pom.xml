@@ -109,6 +109,12 @@
             <artifactId>caffeine</artifactId>
         </dependency>
 
+        <!-- RabbitMQ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+
         <!-- Search -->
         <dependency>
             <groupId>org.apache.lucene</groupId>
