@@ -28,8 +28,7 @@ public class RedisPreDeductService {
 
     @PostConstruct
     public void init() {
-        deductScript = new DefaultRedisScript<>();
-        deductScript.setScriptText(
+        String script =
                 "local key = KEYS[1]\n" +
                 "local stock = redis.call('get', key)\n" +
                 "if stock and tonumber(stock) > 0 then\n" +
@@ -37,24 +36,10 @@ public class RedisPreDeductService {
                 "   return newStock\n" +
                 "else\n" +
                 "   return -1\n" +
-                "end"
-        );
-        deductScript.setResultType(Long.class);
+                "end";
+        deductScript = new DefaultRedisScript<>(script, Long.class);
         log.info("Redis 秒杀 Lua 扣减脚本初始化完成");
     }
-
-    /**
-     * 预热名额：将指定名额的剩余数量写入 Redis。
-     *
-     * @param quotaId 名额编号
-     * @param count   剩余数量
-     */
-    public void warmUpQuota(Long quotaId, int count) {
-        String key = QUOTA_KEY_PREFIX + quotaId;
-        stringRedisTemplate.opsForValue().set(key, String.valueOf(count));
-        log.info("预热名额 key={}, count={}", key, count);
-    }
-
     /**
      * 尝试在 Redis 中原子扣减一个名额。
      *
@@ -79,6 +64,19 @@ public class RedisPreDeductService {
         String key = QUOTA_KEY_PREFIX + quotaId;
         Long result = stringRedisTemplate.opsForValue().increment(key, 1);
         log.info("Redis回滚名额 key={}, afterRollback={}", key, result);
+    }
+
+
+    /**
+     * 预热名额：将指定名额的剩余数量写入 Redis。
+     *
+     * @param quotaId 名额编号
+     * @param count   剩余数量
+     */
+    public void warmUpQuota(Long quotaId, int count) {
+        String key = QUOTA_KEY_PREFIX + quotaId;
+        stringRedisTemplate.opsForValue().set(key, String.valueOf(count));
+        log.info("预热名额 key={}, count={}", key, count);
     }
 
     /**

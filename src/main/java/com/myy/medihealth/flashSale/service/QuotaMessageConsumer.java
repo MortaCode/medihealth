@@ -47,7 +47,6 @@ public class QuotaMessageConsumer {
                         message.getUserId(), message.getQuotaId());
                 return;
             }
-
             // 乐观锁冲突 → 判断是否继续重试
             if (message.getRetryCount() < MAX_RETRIES) {
                 // 递增重试计数，重新发送，确认旧消息
@@ -59,7 +58,7 @@ public class QuotaMessageConsumer {
             } else {
                 // 超过最大重试 → REJECT → DLQ + 回滚 Redis
                 channel.basicReject(deliveryTag, false);
-                redisPreDeductService.rollbackQuota(Long.parseLong(message.getQuotaId()));
+                redisPreDeductService.rollbackQuota(Long.parseLong(message.getQuotaId()));//回滚 Redis
                 log.error("名额扣减最终失败，Redis已回滚 userId={}, quotaId={}",
                         message.getUserId(), message.getQuotaId());
             }
@@ -82,11 +81,11 @@ public class QuotaMessageConsumer {
         log.error("""
 
                 ╔══════════════════════════════════════╗
-                ║  [严重告警] 名额扣减最终失败 (DLQ)  ║
+                ║  [严重告警] 名额扣减最终失败 (DLQ)    ║
                 ║  userId  = {}                     ║
                 ║  quotaId = {}                     ║
                 ║  retries = {}                     ║
-                ║  请立即人工核查并补录数据！       ║
+                ║  请立即人工核查并补录数据！            ║
                 ╚══════════════════════════════════════╝
                 """,
                 message.getUserId(), message.getQuotaId(), message.getRetryCount());

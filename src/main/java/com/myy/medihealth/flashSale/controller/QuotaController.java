@@ -40,12 +40,6 @@ public class QuotaController {
     /** MQ 异步补偿次数（DB 同步失败但已交 MQ 处理） */
     private final AtomicLong mqFallbackCount = new AtomicLong(0);
 
-    @PostConstruct
-    public void init() {
-        redisPreDeductService.warmUpQuota(Long.parseLong(quotaId), totalQuota);
-        log.info("秒杀名额预热完成 quotaId={}, total={}", quotaId, totalQuota);
-    }
-
     /**
      * 预约名额（秒杀接口）
      */
@@ -77,6 +71,15 @@ public class QuotaController {
         log.warn("DB同步持久化失败，已转MQ异步补偿 userId={}, quotaId={}",
                 request.userId(), request.quotaId());
         return Result.success("预约成功");
+    }
+
+    /**
+     * 秒杀库存预热
+     */
+    @PostConstruct
+    public void init() {
+        redisPreDeductService.warmUpQuota(Long.parseLong(quotaId), totalQuota);
+        log.info("秒杀名额预热完成 quotaId={}, total={}", quotaId, totalQuota);
     }
 
     /**
