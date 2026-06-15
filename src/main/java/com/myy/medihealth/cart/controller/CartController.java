@@ -21,9 +21,7 @@ public class CartController {
     private final UserService userService;
 
     /**
-     * 购物车
-     * @param request
-     * @return
+     * 获取购物车列表 —— Redis 优先，miss 回源 DB
      */
     @GetMapping("/list")
     public Result<List<CartItem>> list(HttpServletRequest request) {
@@ -33,10 +31,7 @@ public class CartController {
     }
 
     /**
-     * 添加购物车
-     * @param vo
-     * @param request
-     * @return
+     * 加入购物车 —— 异步校验库存 + Redis 写入 + 异步同步 DB
      */
     @PostMapping("/add")
     public Result<CartItem> add(@Valid @RequestBody CartAddVo vo, HttpServletRequest request) {
@@ -45,6 +40,9 @@ public class CartController {
         return Result.success(cartItem);
     }
 
+    /**
+     * 更新购物车项数量 —— Redis 立即生效 + 异步 DB
+     */
     @PutMapping("/item/{id}/qty/{quantity}")
     public Result<CartItem> updateQty(@PathVariable String id,
                                       @PathVariable int quantity,
@@ -54,6 +52,9 @@ public class CartController {
         return Result.success(cartItem);
     }
 
+    /**
+     * 切换选中状态 —— Redis 立即生效 + 异步 DB
+     */
     @PutMapping("/item/{id}/toggle")
     public Result<CartItem> toggleSelect(@PathVariable String id,
                                          HttpServletRequest request) {
@@ -62,6 +63,9 @@ public class CartController {
         return Result.success(cartItem);
     }
 
+    /**
+     * 删除购物车项 —— Redis 立即生效 + 异步 DB
+     */
     @DeleteMapping("/item/{id}")
     public Result<String> remove(@PathVariable String id, HttpServletRequest request) {
         String userId = userService.getLoginUserId(request);

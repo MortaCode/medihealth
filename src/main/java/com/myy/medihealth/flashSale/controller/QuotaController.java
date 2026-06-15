@@ -48,7 +48,7 @@ public class QuotaController {
         log.info("收到预约请求 userId={}, quotaId={}", request.userId(), request.quotaId());
 
         // 第一步：Redis 原子预扣减
-        boolean deducted = redisPreDeductService.tryDeductQuota(Long.parseLong(request.quotaId()));
+        boolean deducted = redisPreDeductService.tryDeductQuota(Long.parseLong(request.quotaId()), request.userId());
         if (!deducted) {
             failCount.incrementAndGet();
             return Result.error("名额已满，预约失败");

@@ -87,8 +87,7 @@ public class ProductService {
                     .collect(Collectors.groupingBy(
                             ProductSaleAttrValue::getSpuId,
                             LinkedHashMap::new,
-                            Collectors.mapping(ProductSaleAttrValue::getAttrValue,
-                                    Collectors.toList())));
+                            Collectors.mapping(ProductSaleAttrValue::getAttrValue, Collectors.toList())));
             for (ProductSpuListVo vo : result.getRecords()) {
                 vo.setSaleAttrTags(tagMap.getOrDefault(vo.getSpuId(), List.of()));
             }
@@ -153,7 +152,7 @@ public class ProductService {
 
         // [3] 图片
         CompletableFuture<Void> imagesFuture = CompletableFuture.runAsync(() -> {
-            vo.setImages(skuImageService.getImagesBySpuId(spuId));
+            vo.setImages(skuImageService.getImagesBySpuId(spuId));   //获取spu通用图片
         }, bizExecutor);
 
         // [4] 品牌 + 分类（链式依赖 SPU）
@@ -200,6 +199,13 @@ public class ProductService {
         Product sku = productCacheService.getProduct(skuId);
         if (sku == null) throw new BizException("商品不存在");
         return sku;
+    }
+
+    /** SKU 简明信息（仅缓存查） */
+    public Product detail(String id) {
+        Product product = productCacheService.getProduct(id);
+        if (product == null) throw new BizException("商品不存在");
+        return product;
     }
 
     // ================================================================
@@ -472,7 +478,6 @@ public class ProductService {
         }
         log.info("SPU下架成功 spuId={}, affectedSkus={}", spuId, skus.size());
     }
-
     private void deleteSubResources(String spuId) {
         // 删除图片
         productImageMapper.delete(new LambdaQueryWrapper<ProductImage>().eq(ProductImage::getSpuId, spuId));
@@ -484,69 +489,6 @@ public class ProductService {
         productDescMapper.deleteById(spuId);
     }
 
-    // ================================================================
-    //  向后兼容方法（cart / order / 旧前端使用）
-    // ================================================================
-
-    /**
-     * SKU 级商品详情（CompletableFuture 扇出，兼容旧版 /detail/{skuId} 调用）
-     */
-    public ProductDetailVo item(String skuId) throws ExecutionException, InterruptedException {
-        ProductDetailVo vo = new ProductDetailVo();
-
-        CompletableFuture<Product> skuFuture = CompletableFuture.supplyAsync(() -> {
-            Product skuInfo = productCacheService.getProduct(skuId);
-            if (skuInfo == null) throw new BizException("商品不存在");
-            vo.setSkuInfo(skuInfo);
-            return skuInfo;
-        }, bizExecutor);
-
-        CompletableFuture<Void> imageFuture = CompletableFuture.runAsync(() -> {
-            vo.setImages(skuImageService.getImagesBySkuId(skuId));
-        }, bizExecutor);
-
-        CompletableFuture<Void> saleAttrFuture = skuFuture.thenAcceptAsync(sku -> {
-            String spuId = sku.getSpuId();
-            if (spuId != null) vo.setSaleAttrs(saleAttrService.getSaleAttrsBySpuId(spuId));
-        }, bizExecutor);
-
-        CompletableFuture<Void> descFuture = skuFuture.thenAcceptAsync(sku -> {
-            String spuId = sku.getSpuId();
-            if (spuId != null) vo.setDescription(spuDescService.getBySpuId(spuId));
-        }, bizExecutor);
-
-        CompletableFuture<Void> specFuture = skuFuture.thenAcceptAsync(sku -> {
-            String spuId = sku.getSpuId();
-            if (spuId != null) vo.setAttrGroups(productSpecService.getAttrGroupsBySpuId(spuId));
-        }, bizExecutor);
-
-        CompletableFuture<Void> spuInfoFuture = skuFuture.thenAcceptAsync(sku -> {
-            String spuId = sku.getSpuId();
-            if (spuId == null) return;
-            ProductSpu spuInfo = spuInfoService.getById(spuId);
-            vo.setSpuInfo(spuInfo);
-            if (spuInfo != null) {
-                if (spuInfo.getBrandId() != null) vo.setBrand(brandService.getById(spuInfo.getBrandId()));
-                if (spuInfo.getCategoryId() != null) vo.setCategory(categoryService.getById(spuInfo.getCategoryId()));
-            }
-        }, bizExecutor);
-
-        try {
-            CompletableFuture.allOf(imageFuture, saleAttrFuture, descFuture, specFuture, spuInfoFuture)
-                    .get(5, TimeUnit.SECONDS);
-        } catch (TimeoutException e) {
-            log.error("商品详情聚合超时 skuId={}", skuId);
-        }
-        return vo;
-    }
-
-    /** SKU 简明信息（仅缓存查） */
-    public Product detail(String id) {
-        Product product = productCacheService.getProduct(id);
-        if (product == null) throw new BizException("商品不存在");
-        return product;
-    }
-
     /** 批量 SKU 信息（购物车/订单使用） */
     public List<Product> batchDetail(List<String> ids) {
         if (ids == null || ids.isEmpty()) return List.of();
@@ -554,58 +496,115 @@ public class ProductService {
                 .values().stream().toList();
     }
 
-    /** 旧版 SKU 级分页（向后兼容） */
-    public IPage<Product> page(int page, int size, String category, String keyword) {
-        LambdaQueryWrapper<Product> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Product::getStatus, 1);
-        if (StrUtil.isNotBlank(category)) wrapper.eq(Product::getCategory, category);
-        if (StrUtil.isNotBlank(keyword)) wrapper.like(Product::getName, keyword);
-        wrapper.orderByDesc(Product::getCreateTime);
-        return productMapper.selectPage(new Page<>(page, size), wrapper);
-    }
+//    /** 旧版 SKU 级分页（向后兼容） */
+//    public IPage<Product> page(int page, int size, String category, String keyword) {
+//        LambdaQueryWrapper<Product> wrapper = new LambdaQueryWrapper<>();
+//        wrapper.eq(Product::getStatus, 1);
+//        if (StrUtil.isNotBlank(category)) wrapper.eq(Product::getCategory, category);
+//        if (StrUtil.isNotBlank(keyword)) wrapper.like(Product::getName, keyword);
+//        wrapper.orderByDesc(Product::getCreateTime);
+//        return productMapper.selectPage(new Page<>(page, size), wrapper);
+//    }
+//
+//    /** 旧版单 SKU 上架（向后兼容） */
+//    public Product create(ProductSaveVo vo) {
+//        Product product = new Product();
+//        product.setId(IdUtil.fastSimpleUUID());
+//        product.setSpuId(vo.spuId());
+//        product.setName(vo.name());
+//        product.setDescription(vo.description());
+//        product.setPrice(vo.price());
+//        product.setStock(vo.stock());
+//        product.setImage(vo.image());
+//        product.setImages(vo.images());
+//        product.setCategory(vo.category());
+//        product.setStatus(vo.status() != null ? vo.status() : 1);
+//        product.setSales(0);
+//        product.setPrescriptionRequired(vo.prescriptionRequired() != null ? vo.prescriptionRequired() : 0);
+//        product.setCreateTime(LocalDateTime.now());
+//        product.setUpdateTime(LocalDateTime.now());
+//        productMapper.insert(product);
+//        productCacheService.cacheProduct(product);
+//        return product;
+//    }
+//
+//    /** 旧版单 SKU 更新（向后兼容） */
+//    public Product update(String id, ProductSaveVo vo) {
+//        Product product = productMapper.selectById(id);
+//        if (product == null) throw new BizException("商品不存在");
+//        BeanUtil.copyProperties(vo, product, "id", "createTime", "sales");
+//        product.setUpdateTime(LocalDateTime.now());
+//        productMapper.updateById(product);
+//        productCacheService.evictCache(id);
+//        productCacheService.cacheProduct(product);
+//        return product;
+//    }
+//
+//    /** 旧版单 SKU 下架（向后兼容） */
+//    public Product offShelf(String id) {
+//        Product product = productMapper.selectById(id);
+//        if (product == null) throw new BizException("商品不存在");
+//        product.setStatus(0);
+//        product.setUpdateTime(LocalDateTime.now());
+//        productMapper.updateById(product);
+//        productCacheService.evictCache(id);
+//        return product;
+//    }
 
-    /** 旧版单 SKU 上架（向后兼容） */
-    public Product create(ProductSaveVo vo) {
-        Product product = new Product();
-        product.setId(IdUtil.fastSimpleUUID());
-        product.setSpuId(vo.spuId());
-        product.setName(vo.name());
-        product.setDescription(vo.description());
-        product.setPrice(vo.price());
-        product.setStock(vo.stock());
-        product.setImage(vo.image());
-        product.setImages(vo.images());
-        product.setCategory(vo.category());
-        product.setStatus(vo.status() != null ? vo.status() : 1);
-        product.setSales(0);
-        product.setPrescriptionRequired(vo.prescriptionRequired() != null ? vo.prescriptionRequired() : 0);
-        product.setCreateTime(LocalDateTime.now());
-        product.setUpdateTime(LocalDateTime.now());
-        productMapper.insert(product);
-        productCacheService.cacheProduct(product);
-        return product;
-    }
 
-    /** 旧版单 SKU 更新（向后兼容） */
-    public Product update(String id, ProductSaveVo vo) {
-        Product product = productMapper.selectById(id);
-        if (product == null) throw new BizException("商品不存在");
-        BeanUtil.copyProperties(vo, product, "id", "createTime", "sales");
-        product.setUpdateTime(LocalDateTime.now());
-        productMapper.updateById(product);
-        productCacheService.evictCache(id);
-        productCacheService.cacheProduct(product);
-        return product;
-    }
+    // ================================================================
+    //  向后兼容方法（cart / order / 旧前端使用）
+    // ================================================================
 
-    /** 旧版单 SKU 下架（向后兼容） */
-    public Product offShelf(String id) {
-        Product product = productMapper.selectById(id);
-        if (product == null) throw new BizException("商品不存在");
-        product.setStatus(0);
-        product.setUpdateTime(LocalDateTime.now());
-        productMapper.updateById(product);
-        productCacheService.evictCache(id);
-        return product;
-    }
+//    /**
+//     * SKU 级商品详情（CompletableFuture 扇出，兼容旧版 /detail/{skuId} 调用）
+//     */
+//    public ProductDetailVo item(String skuId) throws ExecutionException, InterruptedException {
+//        ProductDetailVo vo = new ProductDetailVo();
+//
+//        CompletableFuture<Product> skuFuture = CompletableFuture.supplyAsync(() -> {
+//            Product skuInfo = productCacheService.getProduct(skuId);
+//            if (skuInfo == null) throw new BizException("商品不存在");
+//            vo.setSkuInfo(skuInfo);
+//            return skuInfo;
+//        }, bizExecutor);
+//
+//        CompletableFuture<Void> imageFuture = CompletableFuture.runAsync(() -> {
+//            vo.setImages(skuImageService.getImagesBySkuId(skuId));
+//        }, bizExecutor);
+//
+//        CompletableFuture<Void> saleAttrFuture = skuFuture.thenAcceptAsync(sku -> {
+//            String spuId = sku.getSpuId();
+//            if (spuId != null) vo.setSaleAttrs(saleAttrService.getSaleAttrsBySpuId(spuId));
+//        }, bizExecutor);
+//
+//        CompletableFuture<Void> descFuture = skuFuture.thenAcceptAsync(sku -> {
+//            String spuId = sku.getSpuId();
+//            if (spuId != null) vo.setDescription(spuDescService.getBySpuId(spuId));
+//        }, bizExecutor);
+//
+//        CompletableFuture<Void> specFuture = skuFuture.thenAcceptAsync(sku -> {
+//            String spuId = sku.getSpuId();
+//            if (spuId != null) vo.setAttrGroups(productSpecService.getAttrGroupsBySpuId(spuId));
+//        }, bizExecutor);
+//
+//        CompletableFuture<Void> spuInfoFuture = skuFuture.thenAcceptAsync(sku -> {
+//            String spuId = sku.getSpuId();
+//            if (spuId == null) return;
+//            ProductSpu spuInfo = spuInfoService.getById(spuId);
+//            vo.setSpuInfo(spuInfo);
+//            if (spuInfo != null) {
+//                if (spuInfo.getBrandId() != null) vo.setBrand(brandService.getById(spuInfo.getBrandId()));
+//                if (spuInfo.getCategoryId() != null) vo.setCategory(categoryService.getById(spuInfo.getCategoryId()));
+//            }
+//        }, bizExecutor);
+//
+//        try {
+//            CompletableFuture.allOf(imageFuture, saleAttrFuture, descFuture, specFuture, spuInfoFuture)
+//                    .get(5, TimeUnit.SECONDS);
+//        } catch (TimeoutException e) {
+//            log.error("商品详情聚合超时 skuId={}", skuId);
+//        }
+//        return vo;
+//    }
 }

@@ -34,7 +34,7 @@ public class QuotaMessageConsumer {
     @RabbitListener(queues = RabbitMQConfig.MAIN_QUEUE, ackMode = "MANUAL")
     public void handleDeductMessage(QuotaDeductMessage message,
                                      Channel channel,
-                                     @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) {
+                                     @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) {  //deliveryTag唯一递增整数，仅在同一 Channel 内有效
         log.info("处理名额扣减消息 userId={}, quotaId={}, retry={}/{}",
                 message.getUserId(), message.getQuotaId(), message.getRetryCount(), MAX_RETRIES);
 
@@ -42,7 +42,7 @@ public class QuotaMessageConsumer {
             boolean success = databaseUpdateService.deductQuotaWithOptimisticLock(message.getQuotaId());
 
             if (success) {
-                channel.basicAck(deliveryTag, false);
+                channel.basicAck(deliveryTag, false);  //param1:删除队列消息deliveryTag   param2：是否批量确认
                 log.info("名额扣减异步落库成功 userId={}, quotaId={}",
                         message.getUserId(), message.getQuotaId());
                 return;
@@ -57,7 +57,7 @@ public class QuotaMessageConsumer {
                         message.getUserId(), message.getRetryCount());
             } else {
                 // 超过最大重试 → REJECT → DLQ + 回滚 Redis
-                channel.basicReject(deliveryTag, false);
+                channel.basicReject(deliveryTag, false);   //false：丢弃消息 或 发送到死信队列    true重新放入队尾
                 redisPreDeductService.rollbackQuota(Long.parseLong(message.getQuotaId()));//回滚 Redis
                 log.error("名额扣减最终失败，Redis已回滚 userId={}, quotaId={}",
                         message.getUserId(), message.getQuotaId());
@@ -81,12 +81,13 @@ public class QuotaMessageConsumer {
         log.error("""
 
                 ╔══════════════════════════════════════╗
-                ║  [严重告警] 名额扣减最终失败 (DLQ)    ║
+                ║  [严重告警] 名额扣减最终失败 (DLQ)     ║
                 ║  userId  = {}                     ║
                 ║  quotaId = {}                     ║
                 ║  retries = {}                     ║
                 ║  请立即人工核查并补录数据！            ║
                 ╚══════════════════════════════════════╝
+                
                 """,
                 message.getUserId(), message.getQuotaId(), message.getRetryCount());
     }

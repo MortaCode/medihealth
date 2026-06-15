@@ -1,6 +1,5 @@
 package com.myy.medihealth.flashSale.service;
 
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,7 +7,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
-import java.util.Collections;
+import java.util.Arrays;
 
 /**
  * Redis 预扣减服务。
@@ -21,39 +20,47 @@ public class RedisPreDeductService {
     private static final Logger log = LoggerFactory.getLogger(RedisPreDeductService.class);
 
     private static final String QUOTA_KEY_PREFIX = "quota:";
+    private static final String USER_QUOTA_KEY_PREFIX = "quota:user:";
 
     private final StringRedisTemplate stringRedisTemplate;
 
     private final DefaultRedisScript<Long> deductScript;
 
-//    @PostConstruct
-//    public void init() {
-//        String script =
-//                "local key = KEYS[1]\n" +
-//                "local stock = redis.call('get', key)\n" +
-//                "if stock and tonumber(stock) > 0 then\n" +
-//                "   local newStock = redis.call('decr', key)\n" +
-//                "   return newStock\n" +
-//                "else\n" +
-//                "   return -1\n" +
-//                "end";
-//        deductScript = new DefaultRedisScript<>(script, Long.class);
-//        log.info("Redis 秒杀 Lua 扣减脚本初始化完成");
-//    }
     /**
-     * 尝试在 Redis 中原子扣减一个名额。
+     * 尝试在 Redis 中原子扣减一个名额（带一人一单校验）
      *
      * @param quotaId 名额编号
-     * @return true=扣减成功，false=名额已用完
+     * @param userId  用户ID
+     * @return 扣减结果码
+     *         0 或正数：扣减成功，返回剩余库存
+     *         -1：库存不足
+     *         -2：用户已购买过
      */
-    public boolean tryDeductQuota(Long quotaId) {
-        String key = QUOTA_KEY_PREFIX + quotaId;
-        Long result = stringRedisTemplate.execute(deductScript, Collections.singletonList(key));
-        if (result == null || result < 0) {
-            log.warn("Redis 扣减失败，名额已用完 key={}", key);
+    public boolean tryDeductQuota(Long quotaId, String userId) {
+        String stockKey = QUOTA_KEY_PREFIX + quotaId;
+        String userKey = USER_QUOTA_KEY_PREFIX + quotaId;
+
+        Long result = stringRedisTemplate.execute(
+                deductScript,
+                Arrays.asList(stockKey, userKey),  // 两个 KEYS
+                userId                             // ARGV[1]
+        );
+
+        if (result == null) {
+            log.warn("Redis 执行失败，返回 null key={}", stockKey);
             return false;
         }
-        log.info("Redis 扣减成功 key={}, remaining={}", key, result);
+
+        if (result < 0) {
+            if (result == -2) {
+                log.warn("用户已购买过 quotaId={}, userId={}", quotaId, userId);
+            } else {
+                log.warn("名额已用完 key={}", stockKey);
+            }
+            return false;
+        }
+
+        log.info("扣减成功 quotaId={}, userId={}, remaining={}", quotaId, userId, result);
         return true;
     }
 

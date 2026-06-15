@@ -25,7 +25,9 @@ public class ProductController {
 
     private final ProductService productService;
 
-
+    // ================================================================
+    //  列表
+    // ================================================================
     /**
      * SPU 级商品列表（京东/淘宝列表页）
      */
@@ -41,7 +43,9 @@ public class ProductController {
         return Result.success(result);
     }
 
-
+    // ================================================================
+    //  详情
+    // ================================================================
     /**
      * SPU 商品详情（含所有 SKU 变体、规格参数、销售属性面板）
      */
@@ -62,17 +66,6 @@ public class ProductController {
     }
 
     /**
-     * SKU 级详情（旧版兼容，建议迁移到 /detail/{spuId}）
-     */
-    @Deprecated
-    @GetMapping("/detail/sku/{skuId}")
-    public Result<ProductDetailVo> detailBySku(@PathVariable String skuId)
-            throws ExecutionException, InterruptedException {
-        ProductDetailVo vo = productService.item(skuId);
-        return Result.success(vo);
-    }
-
-    /**
      * SKU 简明信息（cart/order 内部使用）
      */
     @GetMapping("/simple/{id}")
@@ -81,7 +74,9 @@ public class ProductController {
         return Result.success(product);
     }
 
-
+    // ================================================================
+    //  上架 / 更新 / 下架
+    // ================================================================
     /**
      * 商品上架 —— 全链路 SPU+SKU+图片+规格+销售属性+描述
      */
@@ -109,4 +104,16 @@ public class ProductController {
         productService.offSpu(spuId);
         return Result.success("下架成功");
     }
+
+
+//    /**
+//     * SKU 级详情（旧版兼容，建议迁移到 /detail/{spuId}）
+//     */
+//    @Deprecated
+//    @GetMapping("/detail/sku/{skuId}")
+//    public Result<ProductDetailVo> detailBySku(@PathVariable String skuId)
+//            throws ExecutionException, InterruptedException {
+//        ProductDetailVo vo = productService.item(skuId);
+//        return Result.success(vo);
+//    }
 }
