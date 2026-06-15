@@ -24,22 +24,22 @@ public class RedisPreDeductService {
 
     private final StringRedisTemplate stringRedisTemplate;
 
-    private DefaultRedisScript<Long> deductScript;
+    private final DefaultRedisScript<Long> deductScript;
 
-    @PostConstruct
-    public void init() {
-        String script =
-                "local key = KEYS[1]\n" +
-                "local stock = redis.call('get', key)\n" +
-                "if stock and tonumber(stock) > 0 then\n" +
-                "   local newStock = redis.call('decr', key)\n" +
-                "   return newStock\n" +
-                "else\n" +
-                "   return -1\n" +
-                "end";
-        deductScript = new DefaultRedisScript<>(script, Long.class);
-        log.info("Redis 秒杀 Lua 扣减脚本初始化完成");
-    }
+//    @PostConstruct
+//    public void init() {
+//        String script =
+//                "local key = KEYS[1]\n" +
+//                "local stock = redis.call('get', key)\n" +
+//                "if stock and tonumber(stock) > 0 then\n" +
+//                "   local newStock = redis.call('decr', key)\n" +
+//                "   return newStock\n" +
+//                "else\n" +
+//                "   return -1\n" +
+//                "end";
+//        deductScript = new DefaultRedisScript<>(script, Long.class);
+//        log.info("Redis 秒杀 Lua 扣减脚本初始化完成");
+//    }
     /**
      * 尝试在 Redis 中原子扣减一个名额。
      *

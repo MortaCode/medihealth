@@ -1,6 +1,6 @@
 package com.myy.medihealth.flashSale.service;
 
-import com.myy.medihealth.flashSale.config.RabbitMQConfig;
+import com.myy.medihealth.common.config.RabbitMQConfig;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +31,7 @@ public class QuotaMessageConsumer {
     private final RedisPreDeductService redisPreDeductService;
     private final QuotaMessageProducer producer;
 
-    @RabbitListener(queues = RabbitMQConfig.QUEUE, ackMode = "MANUAL")
+    @RabbitListener(queues = RabbitMQConfig.MAIN_QUEUE, ackMode = "MANUAL")
     public void handleDeductMessage(QuotaDeductMessage message,
                                      Channel channel,
                                      @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) {
@@ -76,7 +76,7 @@ public class QuotaMessageConsumer {
     /**
      * DLQ — 最终失败，需人工介入
      */
-    @RabbitListener(queues = RabbitMQConfig.DLQ)
+    @RabbitListener(queues = RabbitMQConfig.DLQ_QUEUE)
     public void handleDlqMessage(QuotaDeductMessage message) {
         log.error("""
 

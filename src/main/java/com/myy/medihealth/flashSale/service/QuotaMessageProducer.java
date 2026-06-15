@@ -1,6 +1,6 @@
 package com.myy.medihealth.flashSale.service;
 
-import com.myy.medihealth.flashSale.config.RabbitMQConfig;
+import com.myy.medihealth.common.config.RabbitMQConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -24,8 +24,8 @@ public class QuotaMessageProducer {
      */
     public void sendDeductMessage(QuotaDeductMessage message) {
         rabbitTemplate.convertAndSend(
-                RabbitMQConfig.EXCHANGE,
-                RabbitMQConfig.ROUTING_KEY,
+                RabbitMQConfig.MAIN_EXCHANGE,
+                RabbitMQConfig.MAIN_ROUTING_KEY,
                 message
         );
         log.info("已发送名额扣减补偿消息 userId={}, quotaId={}, retryCount={}",
@@ -37,8 +37,8 @@ public class QuotaMessageProducer {
      */
     public void sendToDlq(QuotaDeductMessage message) {
         rabbitTemplate.convertAndSend(
-                RabbitMQConfig.EXCHANGE,
-                RabbitMQConfig.DLQ,
+                RabbitMQConfig.DLX_EXCHANGE,
+                RabbitMQConfig.DLX_ROUTING_KEY,
                 message
         );
         log.error("名额扣减最终失败，已入死信队列 userId={}, quotaId={}",

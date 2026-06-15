@@ -24,4 +24,13 @@ public class RedisScriptConfig {
         script.setResultType(Long.class);
         return script;
     }
+
+
+    @Bean("deductScript")
+    public DefaultRedisScript<Long> deductScript() {
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setScriptSource(new ResourceScriptSource(new ClassPathResource("lua/dudect.lua")));
+        script.setResultType(Long.class);
+        return script;
+    }
 }
