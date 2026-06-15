@@ -1,7 +1,6 @@
 package com.myy.medihealth.cart.service;
 
 import cn.hutool.core.util.IdUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.myy.medihealth.cart.entity.CartItem;
 import com.myy.medihealth.cart.mapper.CartItemMapper;
 import com.myy.medihealth.common.exception.BizException;
@@ -16,7 +15,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
 
 /**
  * 购物车服务 —— Redis Hash 主导，异步双写 MySQL
@@ -30,7 +28,6 @@ public class CartService {
     private final CartItemMapper cartItemMapper;
     private final CartRedisService cartRedisService;
     private final ProductCacheService productCacheService;
-    private final ExecutorService bizExecutor;
 
     /**
      * 获取购物车列表 —— Redis 优先，miss 回源 DB
@@ -51,16 +48,11 @@ public class CartService {
     public CartItem add(String userId, String productId, int quantity) {
         // 1. 异步从缓存获取商品，同时检查 Redis 购物车是否已有
         CompletableFuture<Product> productFuture = productCacheService.getProductAsync(productId);
-        Map<String, CartItem> existingCart = cartRedisService.getCart(userId);
-
         Product product = productFuture.join();
-        if (product == null) {
-            throw new BizException("商品不存在");
-        }
-        if (product.getStatus() != 1) {
-            throw new BizException("商品已下架");
-        }
+        if (product == null) {throw new BizException("商品不存在");}
+        if (product.getStatus() != 1) {throw new BizException("商品已下架");}
 
+        Map<String, CartItem> existingCart = cartRedisService.getCart(userId);
         CartItem existingItem = existingCart.get(productId);
 
         if (existingItem != null) {
@@ -74,9 +66,7 @@ public class CartService {
             return existingItem;
         }
 
-        if (product.getStock() < quantity) {
-            throw new BizException("商品库存不足");
-        }
+        if (product.getStock() < quantity) {throw new BizException("商品库存不足");}
 
         CartItem newItem = new CartItem();
         newItem.setId(IdUtil.fastSimpleUUID());
@@ -120,7 +110,7 @@ public class CartService {
         Map<String, CartItem> cart = getCartOrThrow(userId);
         CartItem cartItem = findCartItem(cart, id, userId);
 
-        cartItem.setSelected(cartItem.getSelected() == 1 ? 0 : 1);
+        cartItem.setSelected(cartItem.getSelected() == 1 ? 0 : 1);  //选择状态
         cartRedisService.updateItem(userId, cartItem);
         cartRedisService.syncToDbAsync(userId, List.of(cartItem));
         return cartItem;

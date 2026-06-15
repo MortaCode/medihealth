@@ -10,6 +10,7 @@ import com.myy.medihealth.order.entity.Order;
 import com.myy.medihealth.order.entity.OrderItem;
 import com.myy.medihealth.order.mapper.OrderItemMapper;
 import com.myy.medihealth.order.mapper.OrderMapper;
+import com.myy.medihealth.payment.vo.OrderSubmitV2Vo;
 import com.myy.medihealth.payment.vo.OrderSubmitVo;
 import com.myy.medihealth.product.entity.Product;
 import com.myy.medihealth.product.mapper.ProductMapper;
@@ -18,15 +19,19 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -43,6 +48,8 @@ import java.util.stream.Collectors;
 public class PaymentService {
 
     private static final String ORDER_LOCK_PREFIX = "lock:order:";
+    private static final String IDEMPOTENT_KEY_PREFIX = "idempotent:order:";
+    private static final Duration IDEMPOTENT_TTL = Duration.ofMinutes(5);
 
     private final CartItemMapper cartItemMapper;
     private final ProductMapper productMapper;
@@ -51,6 +58,8 @@ public class PaymentService {
     private final OrderItemMapper orderItemMapper;
     private final CartRedisService cartRedisService;
     private final RedissonClient redissonClient;
+    private final RedisTemplate<String, Object> redisTemplate;
+    private final ExecutorService bizExecutor;
 
     /**
      * 创建订单 —— 批量校验 + 库存扣减 + 清购物车
@@ -63,7 +72,7 @@ public class PaymentService {
                 throw new BizException("操作过于频繁，请稍后重试");
             }
 
-            // 1. 查询已选中的购物车项
+            // 1. 查询已选中的购物车项DB
             List<CartItem> selectedItems = cartItemMapper.selectList(
                     new LambdaQueryWrapper<CartItem>()
                             .eq(CartItem::getUserId, userId)
@@ -147,6 +156,123 @@ public class PaymentService {
             if (lock.isHeldByCurrentThread()) {
                 lock.unlock();
             }
+        }
+    }
+
+    /**
+     * 创建订单 V2 —— 幂等防重 + 批量DB操作 + 异步清购物车
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Order createOrderV2(String userId, OrderSubmitV2Vo vo) {
+        String idempotentKey = IDEMPOTENT_KEY_PREFIX + userId + ":" + vo.requestId();
+
+        // 1. 幂等性检查：SET NX 原子占位
+        Boolean acquired = redisTemplate.opsForValue()
+                .setIfAbsent(idempotentKey, "PENDING", IDEMPOTENT_TTL);
+        if (Boolean.FALSE.equals(acquired)) {
+            // 已存在 → 检查是否已有结果
+            Object cached = redisTemplate.opsForValue().get(idempotentKey);
+            if (cached != null && !"PENDING".equals(cached.toString())) {
+                Order existOrder = orderMapper.selectOne(
+                        new LambdaQueryWrapper<Order>().eq(Order::getOrderId, cached.toString())
+                );
+                if (existOrder != null) {
+                    return existOrder;
+                }
+            }
+            throw new BizException("订单处理中，请勿重复提交");
+        }
+
+        try {
+            // 2. 查询已选中的购物车项
+            List<CartItem> selectedItems = cartItemMapper.selectList(
+                    new LambdaQueryWrapper<CartItem>()
+                            .eq(CartItem::getUserId, userId)
+                            .eq(CartItem::getSelected, 1)  //选中
+            );
+            if (selectedItems.isEmpty()) {
+                throw new BizException("请选择要购买的商品");
+            }
+
+            // 3. 批量获取商品信息
+            Set<String> productIds = selectedItems.stream()
+                    .map(CartItem::getProductId)
+                    .collect(Collectors.toSet());
+            Map<String, Product> productMap = productCacheService.getProducts(productIds);
+
+            // 4. 遍历校验并构建订单项
+            BigDecimal totalAmount = BigDecimal.ZERO;
+            int prescriptionFlag = 0;
+            List<OrderItem> orderItems = new ArrayList<>();
+
+            for (CartItem cartItem : selectedItems) {
+                Product product = productMap.get(cartItem.getProductId());
+                if (product == null) {
+                    throw new BizException("商品不存在");
+                }
+                if (product.getStatus() != 1) {
+                    throw new BizException("商品【" + product.getName() + "】已下架，请重新选择");
+                }
+                if (product.getStock() < cartItem.getQuantity()) {
+                    throw new BizException("商品【" + product.getName() + "】库存不足");
+                }
+                if (product.getPrescriptionRequired() != null && product.getPrescriptionRequired() == 1) {
+                    prescriptionFlag = 1;
+                }
+
+                BigDecimal itemAmount = product.getPrice().multiply(new BigDecimal(cartItem.getQuantity()));
+                totalAmount = totalAmount.add(itemAmount);
+
+                OrderItem orderItem = buildOrderItem(cartItem, product, itemAmount);
+                orderItems.add(orderItem);
+            }
+
+            // 5. 创建订单
+            String orderId = IdUtil.fastSimpleUUID();
+            Order order = buildOrder(userId, orderId, totalAmount, prescriptionFlag);
+            orderMapper.insert(order);
+
+            // 6. 批量插入订单项（一次 SQL 替代 N 次）
+            for (OrderItem item : orderItems) {
+                item.setOrderId(orderId);
+            }
+            orderItemMapper.batchInsert(orderItems);
+
+            // 7. 扣减库存
+            for (CartItem cartItem : selectedItems) {
+                int affected = productMapper.deductStock(cartItem.getProductId(), cartItem.getQuantity());
+                if (affected == 0) {
+                    throw new BizException("商品库存扣减失败，可能库存不足");
+                }
+            }
+
+            // 8. 批量清除商品缓存（一次 Redis 调用替代 N 次）
+            productCacheService.evictCache(productIds);
+
+            // 9. 清理购物车 DB
+            cartItemMapper.deleteSelectedByUserId(userId);
+
+            // 10. 异步清理购物车 Redis 缓存（非关键路径，不阻塞响应）
+            List<String> removedProductIds = selectedItems.stream()
+                    .map(CartItem::getProductId)
+                    .toList();
+            CompletableFuture.runAsync(
+                    () -> cartRedisService.removeItems(userId, removedProductIds),
+                    bizExecutor
+            );
+
+            log.info("订单创建成功(V2) orderId={}, userId={}, requestId={}, amount={}, items={}",
+                    orderId, userId, vo.requestId(), totalAmount, orderItems.size());
+
+            // 11. 将幂等键更新为 orderId（后续重复请求可直接返回订单）
+            redisTemplate.opsForValue().set(idempotentKey, orderId, IDEMPOTENT_TTL);
+
+            return order;
+
+        } catch (BizException e) {
+            // 业务异常 → 删除幂等键，允许客户端换 requestId 重试
+            redisTemplate.delete(idempotentKey);
+            throw e;
         }
     }
 

@@ -9,14 +9,12 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
-import java.util.stream.Collectors;
 
 /**
  * 购物车 Redis 缓存服务
@@ -28,15 +26,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CartRedisService {
 
-    private static final String CART_KEY_PREFIX = "cart:";
-    private static final Duration CART_TTL = Duration.ofDays(7);
-
     private final RedisTemplate<String, Object> redisTemplate;
     private final CartItemMapper cartItemMapper;
     private final ObjectMapper objectMapper;
     private final ExecutorService bizExecutor;
 
-    // ---------- 读取 ----------
+    private static final String CART_KEY_PREFIX = "cart:";
+    private static final Duration CART_TTL = Duration.ofDays(7);
 
     /**
      * 从 Redis 获取用户购物车
@@ -142,9 +138,7 @@ public class CartRedisService {
                         .eq(CartItem::getUserId, userId)
                         .orderByDesc(CartItem::getCreateTime)
         );
-        if (dbItems.isEmpty()) {
-            return Collections.emptyMap();
-        }
+        if (dbItems.isEmpty()) {return Collections.emptyMap();}
         // 回填 Redis
         String key = CART_KEY_PREFIX + userId;
         Map<String, CartItem> result = new LinkedHashMap<>();

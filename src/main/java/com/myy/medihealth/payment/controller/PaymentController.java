@@ -5,8 +5,10 @@ import com.myy.medihealth.login.service.UserService;
 import com.myy.medihealth.order.entity.Order;
 import com.myy.medihealth.order.entity.OrderItem;
 import com.myy.medihealth.payment.service.PaymentService;
+import com.myy.medihealth.payment.vo.OrderSubmitV2Vo;
 import com.myy.medihealth.payment.vo.OrderSubmitVo;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,6 +26,13 @@ public class PaymentController {
     public Result<Order> submit(@RequestBody OrderSubmitVo vo, HttpServletRequest request) {
         String userId = userService.getLoginUserId(request);
         Order order = paymentService.createOrder(userId, vo);
+        return Result.success(order);
+    }
+
+    @PostMapping("/submit/v2")
+    public Result<Order> submitV2(@Valid @RequestBody OrderSubmitV2Vo vo, HttpServletRequest request) {
+        String userId = userService.getLoginUserId(request);
+        Order order = paymentService.createOrderV2(userId, vo);
         return Result.success(order);
     }
 
