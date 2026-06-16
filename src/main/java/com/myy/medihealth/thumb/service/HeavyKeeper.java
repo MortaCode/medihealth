@@ -19,13 +19,10 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class HeavyKeeper implements TopK {
 
     private static final Logger log = LoggerFactory.getLogger(HeavyKeeper.class);
-
     /** 桶深度（行数） */
     private static final int DEPTH = 4;
-
     /** 桶宽度（列数） */
     private static final int WIDTH = 500_000;
-
     /** 衰减系数 */
     private static final double DECAY = 0.9;
 
@@ -34,13 +31,10 @@ public class HeavyKeeper implements TopK {
 
     /** 二维桶数组：buckets[depth][width] */
     private final Bucket[][] buckets;
-
     /** 热门项最小堆（按 count 排序） */
     private final PriorityQueue<HotItem> minHeap;
-
     /** 热门项计数映射（用于去重和快速查找） */
     private final Map<String, Long> hotCountMap;
-
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
     public HeavyKeeper() {

@@ -9,18 +9,10 @@ import org.springframework.scripting.support.ResourceScriptSource;
 @Configuration
 public class RedisScriptConfig {
 
-    @Bean("thumbScript")
-    public DefaultRedisScript<Long> thumbScript() {
+    @Bean("thumbToggleScript")
+    public DefaultRedisScript<Long> thumbToggleScript() {
         DefaultRedisScript<Long> script = new DefaultRedisScript<>();
-        script.setScriptSource(new ResourceScriptSource(new ClassPathResource("lua/thumb.lua")));
-        script.setResultType(Long.class);
-        return script;
-    }
-
-    @Bean("unthumbScript")
-    public DefaultRedisScript<Long> unthumbScript() {
-        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
-        script.setScriptSource(new ResourceScriptSource(new ClassPathResource("lua/unthumb.lua")));
+        script.setScriptSource(new ResourceScriptSource(new ClassPathResource("lua/thumb_toggle.lua")));
         script.setResultType(Long.class);
         return script;
     }

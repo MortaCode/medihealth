@@ -1,110 +1,112 @@
 package com.myy.medihealth.thumb.job;
 
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.myy.medihealth.thumb.entity.HealthArticle;
 import com.myy.medihealth.thumb.entity.LikeRecord;
 import com.myy.medihealth.thumb.mapper.HealthArticleMapper;
-import com.myy.medihealth.thumb.mapper.LikeRecordMapper;
 import com.myy.medihealth.thumb.service.LikeUPService;
-import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.data.redis.core.Cursor;
+import com.myy.medihealth.thumb.vo.LikeEnum;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
- * 点赞数据定时同步任务。
- * 每 10 秒将上一个时间片的点赞临时数据从 Redis 同步到 MySQL。
+ * 定时将 Redis 中的临时点赞数据同步到数据库。
+ * 每 10 秒读取上一个时间片的临时数据，批量写入 MySQL。
  */
+@Slf4j
 @Component
-@RequiredArgsConstructor
 public class SyncLike2DBJob {
 
-    private static final Logger log = LoggerFactory.getLogger(SyncLike2DBJob.class);
+    @Resource
+    private LikeUPService likeUPService;
 
-    private static final String LIKE_TEMP_KEY_PREFIX = "like:temp:";
+    @Resource
+    private HealthArticleMapper healthArticleMapper;
 
-    private final RedisTemplate<String, String> redisTemplate;
-    private final LikeRecordMapper likeRecordMapper;
-    private final HealthArticleMapper healthArticleMapper;
-    private final LikeUPService likeUPService;
+    @Resource
+    private RedisTemplate<String, Object> redisTemplate;
 
-    /**
-     * 每 10 秒执行一次：读取上一个时间片的临时点赞数据，批量同步到数据库。
-     */
+    @PostConstruct
+    public void init() {
+        log.info("SyncLike2DBJob 初始化完成，定时任务已注册");
+    }
+
     @Scheduled(fixedRate = 10000)
-    public void syncLikeData() {
-        // 计算上一个时间片（10秒前）
-        String previousTimeslice = likeUPService.timeslice();
-        String tempKey = LIKE_TEMP_KEY_PREFIX + previousTimeslice;
+    @Transactional(rollbackFor = Exception.class)
+    public void run() {
+        String previousTimeslice = likeUPService.previousTimeslice();
+        log.debug("开始同步点赞数据 timeslice={}", previousTimeslice);
+        syncLike2DBByDate(previousTimeslice);
+        log.debug("点赞数据同步完成 timeslice={}", previousTimeslice);
+    }
 
-        // 读取该时间片的所有文章点赞变更数据
-        Map<Object, Object> entries = redisTemplate.opsForHash().entries(tempKey);
-        if (entries == null || entries.isEmpty()) {
+    public void syncLike2DBByDate(String date) {
+        String tempThumbKey = LikeUPService.tempThumbKey(date);
+        Map<Object, Object> allTempThumbMap = redisTemplate.opsForHash().entries(tempThumbKey);
+        log.info("allTempThumbMap={}", allTempThumbMap);
+
+        if (CollUtil.isEmpty(allTempThumbMap)) {
             return;
         }
 
-        log.info("开始同步点赞数据 timeslice={}, articleCount={}", previousTimeslice, entries.size());
+        List<LikeRecord> likeList = new ArrayList<>();
+        LambdaQueryWrapper<LikeRecord> removeWrapper = new LambdaQueryWrapper<>();
+        Map<String, Long> articleLikeCountMap = new HashMap<>();
+        boolean needRemove = false;
 
-        List<String> updatedArticleIds = new ArrayList<>();
+        for (Object keyObj : allTempThumbMap.keySet()) {
+            String userIdArticleId = (String) keyObj;
+            String[] parts = userIdArticleId.split(":");
+            String userId = parts[0];
+            String articleId = parts[1];
 
-        for (Map.Entry<Object, Object> entry : entries.entrySet()) {
-            String articleId = (String) entry.getKey();
-            String countStr = (String) entry.getValue();
+            Long likeType = Long.valueOf(allTempThumbMap.get(userIdArticleId).toString());
 
-            try {
-                int count = Integer.parseInt(countStr);
-                if (count > 0) {
-                    // 点赞增量：需要为新增点赞创建 LikeRecord
-                    // 注意：这里无法精确知道哪些用户执行了点赞，
-                    // 实际生产环境应使用更细粒度的时间片或事件记录
-                    // 这里更新文章的总点赞数
-                    updateArticleLikeCount(articleId, count);
-                    updatedArticleIds.add(articleId);
-                } else if (count < 0) {
-                    // 取消点赞增量：减少文章点赞数
-                    updateArticleLikeCount(articleId, count);
-                    updatedArticleIds.add(articleId);
-                }
-            } catch (NumberFormatException e) {
-                log.warn("无法解析点赞计数 articleId={}, value={}", articleId, countStr);
+            if (likeType == LikeEnum.INCR.getValue()) {
+                LikeRecord record = new LikeRecord();
+                record.setId(IdUtil.objectId());
+                record.setUserId(userId);
+                record.setArticleId(articleId);
+                record.setCreateTime(LocalDateTime.now());
+                likeList.add(record);
+            } else if (likeType == LikeEnum.DECR.getValue()) {
+                needRemove = true;
+                removeWrapper.or().eq(LikeRecord::getUserId, userId).eq(LikeRecord::getArticleId, articleId);
+            } else {
+                continue;
             }
+            articleLikeCountMap.put(articleId, articleLikeCountMap.getOrDefault(articleId, 0L) + likeType);
         }
+
+        // 批量插入点赞记录
+        if (!likeList.isEmpty()) {
+            likeUPService.saveBatch(likeList);
+        }
+
+        // 批量删除取消点赞记录
+        if (needRemove) {
+            likeUPService.remove(removeWrapper);
+        }
+
+        // 原子更新文章点赞数
+        articleLikeCountMap.forEach((articleId, delta) -> {
+            healthArticleMapper.incrLikeCount(articleId, delta);
+        });
 
         // 清理已处理的临时数据
-        redisTemplate.delete(tempKey);
-        log.info("点赞数据同步完成 timeslice={}, updatedArticles={}", previousTimeslice, updatedArticleIds.size());
+        redisTemplate.delete(tempThumbKey);
     }
 
-    /**
-     * 更新文章点赞计数并在数据库中增删点赞记录。
-     */
-    private void updateArticleLikeCount(String articleId, int increment) {
-        HealthArticle article = healthArticleMapper.selectById(articleId);
-        if (article == null) {
-            log.warn("文章不存在，跳过点赞同步 articleId={}", articleId);
-            return;
-        }
-
-        int newCount = Math.max(0, (article.getLikeCount() == null ? 0 : article.getLikeCount()) + increment);
-        article.setLikeCount(newCount);
-        article.setUpdateTime(LocalDateTime.now());
-        healthArticleMapper.updateById(article);
-    }
-
-    /**
-     * 扫描所有临时时间片键（用于排查）。
-     */
-    public Set<String> scanTempKeys() {
-        return redisTemplate.keys(LIKE_TEMP_KEY_PREFIX + "*");
-    }
 }
