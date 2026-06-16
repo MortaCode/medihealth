@@ -87,6 +87,7 @@ public class SyncLike2DBJob {
             } else {
                 continue;
             }
+            //文章点赞数
             articleLikeCountMap.put(articleId, articleLikeCountMap.getOrDefault(articleId, 0L) + likeType);
         }
 

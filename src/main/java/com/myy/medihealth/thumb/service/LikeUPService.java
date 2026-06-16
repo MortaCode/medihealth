@@ -82,9 +82,7 @@ public class LikeUPService extends ServiceImpl<LikeRecordMapper, LikeRecord> {
         // 先查 Redis Hash
         String userKey = thumbKey(userId);
         Boolean exists = redisTemplate.opsForHash().hasKey(userKey, articleId);
-        if (Boolean.TRUE.equals(exists)) {
-            return true;
-        }
+        if (Boolean.TRUE.equals(exists)) {return true;}
 
         // Redis 中没有，查数据库
         LambdaQueryWrapper<LikeRecord> wrapper = new LambdaQueryWrapper<>();
@@ -107,7 +105,7 @@ public class LikeUPService extends ServiceImpl<LikeRecordMapper, LikeRecord> {
     public String timeslice(Date date) {
         int second = DateUtil.second(date);
         int sliceSecond = (second / 10) * 10;
-        return DateUtil.format(date, "yyyy-MM-dd HH:mm:") + String.format("%02d", sliceSecond);
+        return DateUtil.format(date, "yyyy-MM-dd HH:mm:") + String.format("%02d", sliceSecond);  //十进制、用零补充、长度为2
     }
 
     /**

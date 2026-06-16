@@ -11,10 +11,12 @@ local userId = ARGV[1]
 local articleId = ARGV[2]
 local hashKey = userId .. ':' .. articleId
 
+-- 1已存在   0不存在
 local liked = redis.call('hexists', userKey, articleId)
 
 if liked == 1 then
     -- Currently liked → unlike: record -1 in temp hash
+    -- 0未处理   -1取消点赞    1点赞
     redis.call('hset', tempKey, hashKey, -1)
     redis.call('hdel', userKey, articleId)
     return 2
