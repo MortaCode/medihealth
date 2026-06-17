@@ -12,7 +12,6 @@ import com.myy.medihealth.thumb.service.HeavyKeeper;
 import com.myy.medihealth.thumb.service.LikeUPService;
 import com.myy.medihealth.thumb.vo.ArticleThumbResult;
 import com.myy.medihealth.thumb.vo.HealthArticleVo;
-import com.myy.medihealth.thumb.vo.MsgVo;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -44,6 +43,8 @@ public class HealthArticleController {
     private final ExecutorService bizExecutor;
     private final SyncLike2DBCompensateJob compensateJob;
 
+
+    // ==================== 查询 ====================
     /**
      * 按ID查询单篇文章（含点赞数和当前用户点赞状态）。
      * 优先走多级缓存。
@@ -112,7 +113,9 @@ public class HealthArticleController {
     }
 
     // ==================== 修改 ====================
-
+    /**
+     * 发布
+     */
     @PostMapping("/create")
     public Result<HealthArticle> create(HttpServletRequest request,
                                          @RequestBody HealthArticleVo vo) {
@@ -121,7 +124,9 @@ public class HealthArticleController {
                 vo, loginUser.getId(), loginUser.getNickname());
         return Result.success(article);
     }
-
+    /**
+     * 更新
+     */
     @PutMapping("/update")
     public Result<HealthArticle> update(HttpServletRequest request,
                                          @RequestParam String articleId,
@@ -131,7 +136,9 @@ public class HealthArticleController {
         cacheManager.evictCache(articleId);
         return Result.success(article);
     }
-
+    /**
+     * 删除
+     */
     @DeleteMapping("/delete")
     public Result<String> delete(HttpServletRequest request,
                                   @RequestParam String articleId) {
@@ -141,37 +148,9 @@ public class HealthArticleController {
         return Result.success("文章已删除");
     }
 
-    // ==================== 点赞 ====================
 
-    @GetMapping("/like")
-    public Result<MsgVo> like(HttpServletRequest request,
-                               @RequestParam String articleId) {
-        if (articleId == null || articleId.isBlank()) {
-            return Result.error("articleId 不能为空");
-        }
-        MsgVo msg = likeUPService.like(request, articleId);
-        // 点赞/取消点赞后刷新缓存
-        cacheManager.evictCache(articleId);
-        return Result.success(msg);
-    }
 
-    /**
-     * 查询用户是否已对文章点赞。
-     */
-    @GetMapping("/hasLiked")
-    public Result<Boolean> hasLiked(HttpServletRequest request,
-                                     @RequestParam String articleId) {
-        try {
-            String userId = (String) request.getAttribute("loginUserId");
-            if (userId == null) {
-                return Result.success(false);
-            }
-            return Result.success(likeUPService.hasLiked(userId, articleId));
-        } catch (Exception e) {
-            return Result.success(false);
-        }
-    }
-
+    // ==================== 管理类接口 ====================
     /**
      * 获取热门文章 Top K（管理员工具）。
      */
