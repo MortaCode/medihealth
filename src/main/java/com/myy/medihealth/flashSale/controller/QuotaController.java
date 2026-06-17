@@ -55,7 +55,7 @@ public class QuotaController {
         }
 
         // 第二步：DB 乐观锁持久化（最多 3 次重试）
-        boolean persisted = databaseUpdateService.deductQuotaWithOptimisticLock(request.quotaId());
+        boolean persisted = databaseUpdateService.deductQuotaWithOptimisticLock(request.quotaId(), request.userId());
         if (persisted) {
             successCount.incrementAndGet();
             log.info("预约成功 userId={}, quotaId={}", request.userId(), request.quotaId());

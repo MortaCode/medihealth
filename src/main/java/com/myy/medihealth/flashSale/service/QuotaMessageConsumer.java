@@ -39,7 +39,7 @@ public class QuotaMessageConsumer {
                 message.getUserId(), message.getQuotaId(), message.getRetryCount(), MAX_RETRIES);
 
         try {
-            boolean success = databaseUpdateService.deductQuotaWithOptimisticLock(message.getQuotaId());
+            boolean success = databaseUpdateService.deductQuotaWithOptimisticLock(message.getQuotaId(), message.getUserId());
 
             if (success) {
                 channel.basicAck(deliveryTag, false);  //param1:删除队列消息deliveryTag   param2：是否批量确认

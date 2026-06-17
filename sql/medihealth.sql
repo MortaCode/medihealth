@@ -311,7 +311,21 @@ CREATE TABLE IF NOT EXISTS `t_quota` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='义诊/体检名额库存表';
 
 -- ============================================================
--- 19. 健康资讯文章表
+-- 19. 秒杀预约记录表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `t_quota_record` (
+    `id`          VARCHAR(32)  NOT NULL COMMENT '主键',
+    `user_id`     VARCHAR(32)  NOT NULL COMMENT '用户ID',
+    `quota_id`    VARCHAR(32)  NOT NULL COMMENT '名额ID',
+    `source`      TINYINT      NOT NULL DEFAULT 0 COMMENT '来源：0-秒杀 1-MQ补偿',
+    `create_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_user_quota` (`user_id`, `quota_id`),
+    KEY `idx_quota_id` (`quota_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='秒杀预约记录表';
+
+-- ============================================================
+-- 20. 健康资讯文章表
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `t_health_article` (
     `id`          VARCHAR(32)   NOT NULL COMMENT '文章ID',
@@ -333,7 +347,7 @@ CREATE TABLE IF NOT EXISTS `t_health_article` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康资讯文章表';
 
 -- ============================================================
--- 20. 点赞记录表
+-- 21. 点赞记录表
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `t_like_record` (
     `id`          VARCHAR(32) NOT NULL COMMENT '主键',
@@ -345,7 +359,7 @@ CREATE TABLE IF NOT EXISTS `t_like_record` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='点赞记录表';
 
 -- ============================================================
--- 21. 对话会话表
+-- 22. 对话会话表
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `t_session` (
     `id`            VARCHAR(32)  NOT NULL COMMENT '会话ID',
@@ -362,7 +376,7 @@ CREATE TABLE IF NOT EXISTS `t_session` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='对话会话表';
 
 -- ============================================================
--- 22. 对话消息表
+-- 23. 对话消息表
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `t_message` (
     `id`           VARCHAR(32)  NOT NULL COMMENT '消息ID',
@@ -380,7 +394,7 @@ CREATE TABLE IF NOT EXISTS `t_message` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='对话消息表';
 
 -- ============================================================
--- 23. 会话记忆快照表
+-- 24. 会话记忆快照表
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `t_snapshot` (
     `id`            VARCHAR(32)  NOT NULL COMMENT '快照ID',
