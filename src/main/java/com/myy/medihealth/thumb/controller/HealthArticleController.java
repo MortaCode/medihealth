@@ -1,13 +1,17 @@
 package com.myy.medihealth.thumb.controller;
 
 import com.myy.medihealth.common.result.Result;
+import com.myy.medihealth.login.entity.User;
+import com.myy.medihealth.login.service.UserService;
 import com.myy.medihealth.thumb.entity.HealthArticle;
 import com.myy.medihealth.thumb.job.SyncLike2DBCompensateJob;
 import com.myy.medihealth.thumb.manage.CacheManager;
+import com.myy.medihealth.thumb.mapper.HealthArticleMapper;
 import com.myy.medihealth.thumb.service.HealthArticleService;
 import com.myy.medihealth.thumb.service.HeavyKeeper;
 import com.myy.medihealth.thumb.service.LikeUPService;
 import com.myy.medihealth.thumb.vo.ArticleThumbResult;
+import com.myy.medihealth.thumb.vo.HealthArticleVo;
 import com.myy.medihealth.thumb.vo.MsgVo;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -17,11 +21,12 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 
 /**
  * 健康文章控制器。
- * 提供文章查询、点赞/取消点赞、数据清理等接口。
+ * 提供文章 CRUD、查询、点赞/取消点赞等接口。
  */
 @RestController
 @RequestMapping("health/article")
@@ -31,9 +36,12 @@ public class HealthArticleController {
     private static final Logger log = LoggerFactory.getLogger(HealthArticleController.class);
 
     private final HealthArticleService healthArticleService;
+    private final HealthArticleMapper healthArticleMapper;
     private final LikeUPService likeUPService;
     private final CacheManager cacheManager;
     private final HeavyKeeper heavyKeeper;
+    private final UserService userService;
+    private final ExecutorService bizExecutor;
     private final SyncLike2DBCompensateJob compensateJob;
 
     /**
@@ -48,7 +56,15 @@ public class HealthArticleController {
             return Result.error(404, "文章不存在");
         }
 
-        // 判断当前用户是否已点赞
+        // 异步更新阅读数
+        bizExecutor.execute(() -> {
+            try {
+                healthArticleMapper.incrViewCount(articleId);
+            } catch (Exception e) {
+                log.warn("异步更新阅读数失败 articleId={}", articleId, e);
+            }
+        });
+
         boolean liked = false;
         try {
             String userId = (String) request.getAttribute("loginUserId");
@@ -95,10 +111,38 @@ public class HealthArticleController {
         return Result.success(healthArticleService.getByCategory(category));
     }
 
-    /**
-     * 点赞/取消点赞切换（需要登录）。
-     * 通过 Redis Lua 脚本原子性地处理点赞操作。
-     */
+    // ==================== 修改 ====================
+
+    @PostMapping("/create")
+    public Result<HealthArticle> create(HttpServletRequest request,
+                                         @RequestBody HealthArticleVo vo) {
+        User loginUser = userService.getLoginUser(request);
+        HealthArticle article = healthArticleService.createArticle(
+                vo, loginUser.getId(), loginUser.getNickname());
+        return Result.success(article);
+    }
+
+    @PutMapping("/update")
+    public Result<HealthArticle> update(HttpServletRequest request,
+                                         @RequestParam String articleId,
+                                         @RequestBody HealthArticleVo vo) {
+        User loginUser = userService.getLoginUser(request);
+        HealthArticle article = healthArticleService.updateArticle(articleId, vo, loginUser.getId());
+        cacheManager.evictCache(articleId);
+        return Result.success(article);
+    }
+
+    @DeleteMapping("/delete")
+    public Result<String> delete(HttpServletRequest request,
+                                  @RequestParam String articleId) {
+        User loginUser = userService.getLoginUser(request);
+        healthArticleService.deleteArticle(articleId, loginUser.getId());
+        cacheManager.evictCache(articleId);
+        return Result.success("文章已删除");
+    }
+
+    // ==================== 点赞 ====================
+
     @GetMapping("/like")
     public Result<MsgVo> like(HttpServletRequest request,
                                @RequestParam String articleId) {

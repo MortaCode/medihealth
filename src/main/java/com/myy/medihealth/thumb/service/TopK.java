@@ -22,4 +22,9 @@ public interface TopK {
      * @return 热门数据键列表（按热度降序）
      */
     List<String> top(int k);
+
+    /**
+     * 判断指定 key 是否在当前热门集合中。
+     */
+    boolean isHot(String key);
 }

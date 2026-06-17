@@ -19,8 +19,8 @@ import java.util.concurrent.TimeUnit;
 /**
  * 多级缓存管理器。
  * <p>
- * 缓存层级：Caffeine（本地）→ Redis（分布式）→ MySQL（持久化）。
- * 读取时逐级回填，提升读性能。
+ * 缓存层级：Caffeine（本地，仅热点）→ Redis（分布式）→ MySQL（持久化）。
+ * 使用 Cache-Aside 模式：读回填，写失效。
  * </p>
  */
 @Service
@@ -30,9 +30,11 @@ public class CacheManager {
     private static final Logger log = LoggerFactory.getLogger(CacheManager.class);
 
     private static final String CACHE_KEY_PREFIX = "article:";
+    private static final String NULL_MARKER = "__NULL__";
     private static final long CAFFEINE_MAX_SIZE = 10_000;
     private static final long CAFFEINE_EXPIRE_MINUTES = 10;
     private static final long REDIS_EXPIRE_MINUTES = 30;
+    private static final long NULL_MARKER_REDIS_TTL_MINUTES = 5;
 
     private final HealthArticleService healthArticleService;
     private final RedisTemplate<String, Object> redisTemplate;
@@ -52,88 +54,87 @@ public class CacheManager {
     }
 
     /**
-     * 多级缓存获取文章。
-     * 查找顺序：Caffeine → Redis → MySQL，命中后逐级回填。
-     *
-     * @param articleId 文章ID
-     * @return 文章实体，不存在返回 null
+     * 多级缓存获取文章（Cache-Aside 读）。
+     * Caffeine → Redis → MySQL，仅热点文章回填 Caffeine。
      */
     public HealthArticle getArticle(String articleId) {
         String cacheKey = CACHE_KEY_PREFIX + articleId;
 
-        // 第一级：Caffeine 本地缓存
+        // L1: Caffeine 本地缓存
         HealthArticle article = caffeineCache.getIfPresent(cacheKey);
         if (article != null) {
-            log.debug("Caffeine 缓存命中 articleId={}", articleId);
             heavyKeeper.add(articleId, 1);
             return article;
         }
 
-        // 第二级：Redis 分布式缓存
+        // L2: Redis 分布式缓存
         Object redisValue = redisTemplate.opsForValue().get(cacheKey);
-        if (redisValue instanceof HealthArticle cached) {
-            log.debug("Redis 缓存命中 articleId={}", articleId);
-            caffeineCache.put(cacheKey, cached);
-            heavyKeeper.add(articleId, 1);
-            return cached;
+        if (redisValue != null) {
+            // 缓存穿透防护：null 标记
+            if (NULL_MARKER.equals(redisValue)) {
+                return null;
+            }
+            if (redisValue instanceof HealthArticle cached) {
+                heavyKeeper.add(articleId, 1);
+                // 仅热点文章回填 Caffeine
+                if (heavyKeeper.isHot(articleId)) {
+                    caffeineCache.put(cacheKey, cached);
+                }
+                return cached;
+            }
         }
 
-        // 第三级：MySQL 数据库
+        // L3: MySQL 数据库
         article = healthArticleService.searchById(articleId);
         if (article != null) {
-            log.debug("MySQL 命中 articleId={}，回填缓存", articleId);
-            redisTemplate.opsForValue().set(cacheKey, article, REDIS_EXPIRE_MINUTES, TimeUnit.MINUTES);
-            caffeineCache.put(cacheKey, article);
             heavyKeeper.add(articleId, 1);
+            // 始终回填 Redis
+            redisTemplate.opsForValue().set(cacheKey, article, REDIS_EXPIRE_MINUTES, TimeUnit.MINUTES);
+            // 仅热点文章回填 Caffeine
+            if (heavyKeeper.isHot(articleId)) {
+                caffeineCache.put(cacheKey, article);
+            }
             return article;
         }
 
-        log.warn("文章不存在 articleId={}", articleId);
+        // Miss: 写入 null 标记防穿透
+        redisTemplate.opsForValue().set(cacheKey, NULL_MARKER, NULL_MARKER_REDIS_TTL_MINUTES, TimeUnit.MINUTES);
+        log.debug("缓存穿透防护：写入 null 标记 articleId={}", articleId);
         return null;
     }
 
     /**
-     * 主动刷新缓存（文章更新时调用）。
-     *
-     * @param articleId 文章ID
+     * 主动刷新缓存（文章更新后调用）。
      */
     public void refreshCache(String articleId) {
         String cacheKey = CACHE_KEY_PREFIX + articleId;
         HealthArticle article = healthArticleService.searchById(articleId);
         if (article != null) {
             redisTemplate.opsForValue().set(cacheKey, article, REDIS_EXPIRE_MINUTES, TimeUnit.MINUTES);
-            caffeineCache.put(cacheKey, article);
-            log.info("缓存已刷新 articleId={}", articleId);
+            if (heavyKeeper.isHot(articleId)) {
+                caffeineCache.put(cacheKey, article);
+            }
+            log.debug("缓存已刷新 articleId={}", articleId);
         } else {
-            // 文章已删除，清理缓存
             evictCache(articleId);
         }
     }
 
     /**
-     * 清除指定文章的缓存。
-     *
-     * @param articleId 文章ID
+     * 清除指定文章的缓存（Cache-Aside 写失效）。
      */
     public void evictCache(String articleId) {
         String cacheKey = CACHE_KEY_PREFIX + articleId;
         redisTemplate.delete(cacheKey);
         caffeineCache.invalidate(cacheKey);
-        log.info("缓存已清除 articleId={}", articleId);
+        log.debug("缓存已清除 articleId={}", articleId);
     }
 
-    /**
-     * 每 20 秒对 HeavyKeeper 执行一次全局衰减，淘汰冷数据。
-     */
     @Scheduled(fixedRate = 20000)
     public void decayHeavyKeeper() {
         heavyKeeper.decayAll();
-        log.debug("HeavyKeeper 定时衰减完成，当前热门项数量={}", heavyKeeper.getHotItemCount());
     }
 
-    /**
-     * 获取 Caffeine 缓存统计信息。
-     */
     public String getCaffeineStats() {
         return caffeineCache.stats().toString();
     }

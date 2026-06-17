@@ -118,6 +118,19 @@ public class HeavyKeeper implements TopK {
         }
     }
 
+    @Override
+    public boolean isHot(String key) {
+        if (key == null) {
+            return false;
+        }
+        lock.readLock().lock();
+        try {
+            return hotCountMap.containsKey(key);
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
     /**
      * 对所有桶执行衰减（定时调用）。
      */
