@@ -325,16 +325,86 @@ ON DUPLICATE KEY UPDATE `openid` = VALUES(`openid`);
 -- ============================================================
 -- 13. 购物车数据
 -- ============================================================
-INSERT INTO `t_cart_item` (`id`, `user_id`, `product_id`, `quantity`, `selected`, `create_time`)
+INSERT INTO `t_cart_item` (`id`, `user_id`, `product_id`, `store_id`, `warehouse_id`, `quantity`, `selected`, `create_time`)
 VALUES
-('cart_001', 'user_001', 'sku_001', 1, 1, NOW()),
-('cart_002', 'user_001', 'sku_006', 2, 1, NOW()),
-('cart_003', 'user_002', 'sku_010', 3, 1, NOW()),
-('cart_004', 'user_002', 'sku_004', 1, 0, NOW())
+('cart_001', 'user_001', 'sku_001', 'store_001', 'wh_001', 1, 1, NOW()),
+('cart_002', 'user_001', 'sku_006', 'store_001', 'wh_001', 2, 1, NOW()),
+('cart_003', 'user_002', 'sku_010', 'store_002', 'wh_002', 3, 1, NOW()),
+('cart_004', 'user_002', 'sku_004', 'store_002', 'wh_002', 1, 0, NOW())
 ON DUPLICATE KEY UPDATE `quantity` = VALUES(`quantity`);
 
 -- ============================================================
--- 14. 义诊名额
+-- 14. 店铺数据
+-- ============================================================
+INSERT INTO `t_store` (`id`, `store_name`, `store_type`, `service_fee_rate`, `settle_cycle`, `contact_phone`, `status`)
+VALUES
+('store_001', 'MediHealth 官方自营', 'SELF', 0.00, 7, '400-100-1001', 1),
+('store_002', '康宁大药房旗舰店', 'THIRD', 0.05, 14, '400-200-2001', 1),
+('store_003', '鱼跃医疗官方店', 'THIRD', 0.05, 14, '400-300-3001', 1),
+('store_004', '汤臣倍健旗舰店', 'THIRD', 0.05, 14, '400-400-4001', 1);
+
+-- ============================================================
+-- 15. 仓库数据
+-- ============================================================
+INSERT INTO `t_warehouse` (`id`, `warehouse_name`, `province`, `city`, `district`, `address`, `store_id`, `coverage_area`, `status`)
+VALUES
+('wh_001', '北京顺义自营仓', '北京', '北京', '顺义区', '顺义区天竺综合保税区', 'store_001', '["北京","天津","河北","山东","山西","内蒙古","辽宁","吉林","黑龙江"]', 1),
+('wh_002', '上海青浦仓', '上海', '上海', '青浦区', '青浦区华新镇物流园区', 'store_002', '["上海","江苏","浙江","安徽"]', 1),
+('wh_003', '广州黄埔仓', '广东', '广州', '黄埔区', '黄埔区保税物流园', 'store_003', '["广东","广西","福建","海南","湖南","江西"]', 1),
+('wh_004', '成都双流仓', '四川', '成都', '双流区', '双流区空港物流园', 'store_004', '["四川","重庆","贵州","云南","西藏","陕西","甘肃","青海","宁夏","新疆"]', 1);
+
+-- ============================================================
+-- 16. 运费模板数据
+-- ============================================================
+INSERT INTO `t_shipping_template` (`id`, `store_id`, `template_name`, `charge_type`, `first_unit`, `first_fee`, `continue_unit`, `continue_fee`, `free_threshold`)
+VALUES
+-- 自营：满99包邮，不满收6元
+('ship_tpl_001', 'store_001', '自营通用运费', 'AMOUNT', 1.00, 6.00, 1.00, 0.00, 99.00),
+-- 第三方：首件8元，续件2元
+('ship_tpl_002', 'store_002', '药房标准运费', 'PIECE', 1.00, 8.00, 1.00, 2.00, NULL),
+-- 鱼跃：按重量计费
+('ship_tpl_003', 'store_003', '器械按重计费', 'WEIGHT', 1.00, 10.00, 1.00, 5.00, NULL),
+-- 汤臣：全场包邮
+('ship_tpl_004', 'store_004', '保健品包邮', 'FREE', 0.00, 0.00, 0.00, 0.00, NULL);
+
+-- ============================================================
+-- 17. 优惠券数据
+-- ============================================================
+INSERT INTO `t_coupon` (`id`, `user_id`, `coupon_type`, `discount_type`, `threshold`, `discount_value`, `applicable_store_ids`, `coupon_name`, `start_time`, `expire_time`, `used`)
+VALUES
+-- 平台券
+('coupon_001', 'user_001', 'PLATFORM', 'FULL_REDUCE', 200.00, 30.00, NULL, '新人专享满200减30', '2025-06-01', '2026-06-30', 0),
+('coupon_002', 'user_001', 'PLATFORM', 'FULL_REDUCE', 500.00, 80.00, NULL, '健康节满500减80', '2025-06-01', '2026-06-30', 0),
+-- 店铺券
+('coupon_003', 'user_001', 'STORE', 'FULL_REDUCE', 100.00, 15.00, '["store_001"]', '自营满100减15', '2025-06-01', '2026-06-30', 0),
+('coupon_004', 'user_002', 'STORE', 'DISCOUNT', 200.00, 0.85, '["store_002"]', '大药房满200享85折', '2025-06-01', '2026-06-30', 0),
+-- 商品券
+('coupon_005', 'user_001', 'PRODUCT', 'FULL_REDUCE', 50.00, 10.00, NULL, '维生素C专属满50减10', '2025-06-01', '2026-06-30', 0);
+
+-- ============================================================
+-- 18. 促销活动数据
+-- ============================================================
+INSERT INTO `t_promotion` (`id`, `promotion_type`, `store_id`, `promotion_name`, `rules`, `stacking`, `start_time`, `end_time`, `status`)
+VALUES
+-- 平台满减（可叠加）
+('promo_001', 'FULL_REDUCE', NULL, '618健康节平台满减',
+ '[{"threshold":200,"value":30},{"threshold":500,"value":80},{"threshold":1000,"value":200}]',
+ 1, '2025-06-01', '2026-06-30', 1),
+-- 自营满减
+('promo_002', 'FULL_REDUCE', 'store_001', '自营满200减50',
+ '[{"threshold":200,"value":50}]',
+ 1, '2025-06-01', '2026-06-30', 1),
+-- 第三方满折
+('promo_003', 'FULL_DISCOUNT', 'store_002', '大药房满300打9折',
+ '[{"threshold":300,"value":0.9}]',
+ 0, '2025-06-01', '2026-06-30', 1),
+-- 满赠活动
+('promo_004', 'FULL_GIFT', 'store_004', '保健品满300赠维生素D试用装',
+ '[{"threshold":300,"value":0}]',
+ 0, '2025-06-01', '2026-06-30', 1);
+
+-- ============================================================
+-- 19. 义诊名额
 -- ============================================================
 INSERT INTO `t_quota` (`id`, `quota_id`, `quota_name`, `total_quota`, `remaining_quota`, `version`, `update_time`)
 VALUES

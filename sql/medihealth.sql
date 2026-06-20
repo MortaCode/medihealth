@@ -200,19 +200,112 @@ CREATE TABLE IF NOT EXISTS `t_product_sale_attr_value` (
 -- 13. 购物车表
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `t_cart_item` (
-    `id`          VARCHAR(32) NOT NULL COMMENT '主键',
-    `user_id`     VARCHAR(32) NOT NULL COMMENT '用户ID',
-    `product_id`  VARCHAR(32) NOT NULL COMMENT '商品ID',
-    `quantity`    INT         NOT NULL DEFAULT 1 COMMENT '数量',
-    `selected`    TINYINT     NOT NULL DEFAULT 1 COMMENT '是否选中：0-未选 1-选中',
-    `create_time` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `id`           VARCHAR(32) NOT NULL COMMENT '主键',
+    `user_id`      VARCHAR(32) NOT NULL COMMENT '用户ID',
+    `product_id`   VARCHAR(32) NOT NULL COMMENT '商品ID',
+    `store_id`     VARCHAR(32) DEFAULT NULL COMMENT '所属店铺ID',
+    `warehouse_id` VARCHAR(32) DEFAULT NULL COMMENT '发货仓库ID',
+    `quantity`     INT         NOT NULL DEFAULT 1 COMMENT '数量',
+    `selected`     TINYINT     NOT NULL DEFAULT 1 COMMENT '是否选中：0-未选 1-选中',
+    `create_time`  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`),
     KEY `idx_user_id` (`user_id`),
+    KEY `idx_store_id` (`store_id`),
     UNIQUE KEY `uk_user_product` (`user_id`, `product_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='购物车表';
 
 -- ============================================================
--- 14. 订单主表
+-- 14. 店铺表 (NEW)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `t_store` (
+    `id`              VARCHAR(32)    NOT NULL COMMENT '店铺ID',
+    `store_name`      VARCHAR(200)   NOT NULL COMMENT '店铺名称',
+    `store_type`      VARCHAR(20)    NOT NULL DEFAULT 'THIRD' COMMENT 'SELF=自营 THIRD=第三方',
+    `service_fee_rate` DECIMAL(5,4)  DEFAULT 0 COMMENT '平台服务费率',
+    `settle_cycle`    INT            DEFAULT 7 COMMENT '结算周期(天)',
+    `contact_phone`   VARCHAR(20)    DEFAULT NULL COMMENT '客服电话',
+    `status`          TINYINT        DEFAULT 1 COMMENT '0=关闭 1=营业',
+    `create_time`     DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '入驻时间',
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='店铺表';
+
+-- ============================================================
+-- 15. 仓库表 (NEW)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `t_warehouse` (
+    `id`             VARCHAR(32)  NOT NULL COMMENT '仓库ID',
+    `warehouse_name` VARCHAR(200) NOT NULL COMMENT '仓库名称',
+    `province`       VARCHAR(50)  DEFAULT NULL COMMENT '省',
+    `city`           VARCHAR(50)  DEFAULT NULL COMMENT '市',
+    `district`       VARCHAR(50)  DEFAULT NULL COMMENT '区',
+    `address`        VARCHAR(500) DEFAULT NULL COMMENT '详细地址',
+    `store_id`       VARCHAR(32)  DEFAULT NULL COMMENT '所属店铺ID',
+    `coverage_area`  TEXT         DEFAULT NULL COMMENT '覆盖区域JSON',
+    `status`         TINYINT      DEFAULT 1 COMMENT '0=停用 1=启用',
+    PRIMARY KEY (`id`),
+    KEY `idx_store_id` (`store_id`),
+    KEY `idx_city` (`city`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='仓库表';
+
+-- ============================================================
+-- 16. 运费模板表 (NEW)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `t_shipping_template` (
+    `id`              VARCHAR(32)    NOT NULL COMMENT '模板ID',
+    `store_id`        VARCHAR(32)    NOT NULL COMMENT '所属店铺ID',
+    `template_name`   VARCHAR(100)   DEFAULT NULL COMMENT '模板名称',
+    `charge_type`     VARCHAR(20)    NOT NULL DEFAULT 'PIECE' COMMENT 'PIECE/WEIGHT/AMOUNT/FREE',
+    `first_unit`      DECIMAL(10,2)  DEFAULT 1 COMMENT '首件/首重数量',
+    `first_fee`       DECIMAL(10,2)  DEFAULT 0 COMMENT '首件/首重费用',
+    `continue_unit`   DECIMAL(10,2)  DEFAULT 1 COMMENT '续件/续重单位',
+    `continue_fee`    DECIMAL(10,2)  DEFAULT 0 COMMENT '续件/续重费用',
+    `free_threshold`  DECIMAL(10,2)  DEFAULT NULL COMMENT '包邮门槛(NULL=不包邮)',
+    PRIMARY KEY (`id`),
+    KEY `idx_store_id` (`store_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='运费模板表';
+
+-- ============================================================
+-- 17. 优惠券表 (NEW)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `t_coupon` (
+    `id`                    VARCHAR(32)    NOT NULL COMMENT '券ID',
+    `user_id`               VARCHAR(32)    NOT NULL COMMENT '持有用户ID',
+    `coupon_type`           VARCHAR(20)    NOT NULL COMMENT 'PLATFORM/STORE/PRODUCT',
+    `discount_type`         VARCHAR(20)    NOT NULL COMMENT 'FULL_REDUCE/DISCOUNT',
+    `threshold`             DECIMAL(10,2)  NOT NULL COMMENT '使用门槛金额',
+    `discount_value`        DECIMAL(10,2)  NOT NULL COMMENT '减免金额或折扣值',
+    `applicable_store_ids`  TEXT           DEFAULT NULL COMMENT '适用店铺ID列表JSON',
+    `applicable_product_ids` TEXT          DEFAULT NULL COMMENT '适用商品ID列表JSON',
+    `coupon_name`           VARCHAR(200)   DEFAULT NULL COMMENT '券名称',
+    `start_time`            DATETIME       NOT NULL COMMENT '生效时间',
+    `expire_time`           DATETIME       NOT NULL COMMENT '过期时间',
+    `used`                  TINYINT        DEFAULT 0 COMMENT '0=未用 1=已用',
+    `create_time`           DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '领取时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_expire_time` (`expire_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='优惠券表';
+
+-- ============================================================
+-- 18. 促销活动表 (NEW)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `t_promotion` (
+    `id`             VARCHAR(32)  NOT NULL COMMENT '活动ID',
+    `promotion_type` VARCHAR(30)  NOT NULL COMMENT 'FULL_REDUCE/FULL_DISCOUNT/FULL_GIFT/N_PER_N_DISCOUNT',
+    `store_id`       VARCHAR(32)  DEFAULT NULL COMMENT '店铺ID(NULL=平台活动)',
+    `promotion_name` VARCHAR(200) DEFAULT NULL COMMENT '活动名称',
+    `rules`          TEXT         DEFAULT NULL COMMENT '规则JSON 如[{"threshold":200,"value":30}]',
+    `stacking`       TINYINT      DEFAULT 0 COMMENT '0=不可叠加 1=可叠加',
+    `start_time`     DATETIME     NOT NULL COMMENT '开始时间',
+    `end_time`       DATETIME     NOT NULL COMMENT '结束时间',
+    `status`         TINYINT      DEFAULT 1 COMMENT '0=停用 1=启用',
+    PRIMARY KEY (`id`),
+    KEY `idx_store_id` (`store_id`),
+    KEY `idx_time` (`start_time`, `end_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='促销活动表';
+
+-- ============================================================
+-- 19. 订单主表
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `t_order` (
     `id`                VARCHAR(32)    NOT NULL COMMENT '主键',
